@@ -1,11 +1,14 @@
 import os
 import smtplib
+import csv
+import io
 from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
+from docx import Document
 
 load_dotenv()
 
@@ -30,18 +33,61 @@ TEMPLATES = {
     "Custom": "Hi {target_name},\n\n{custom_text}\n\nBest,\n{user_name}"
 }
 
+ALLOWED_LOCAL_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._%+-")
+ALLOWED_DOMAIN_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
+
+def is_valid_email_candidate(candidate):
+    if not candidate or candidate.count('@') != 1:
+        return False
+    local_part, domain_part = candidate.split('@')
+    if not local_part or not domain_part or '.' not in domain_part:
+        return False
+    if any(ch not in ALLOWED_LOCAL_CHARS for ch in local_part):
+        return False
+    if any(ch not in ALLOWED_DOMAIN_CHARS for ch in domain_part):
+        return False
+    if domain_part.startswith('.') or domain_part.endswith('.') or '..' in domain_part:
+        return False
+    return True
+
+def extract_emails(text):
+    if not text:
+        return []
+
+    separators = " \n\r\t,;<>\"'()[]{}"
+    normalized_text = text
+    for sep in separators:
+        normalized_text = normalized_text.replace(sep, ' ')
+
+    candidates = normalized_text.split()
+    emails = []
+    seen = set()
+
+    for token in candidates:
+        candidate = token.strip().strip(".:!?,")
+        if is_valid_email_candidate(candidate):
+            lowered = candidate.lower()
+            if lowered not in seen:
+                seen.add(lowered)
+                emails.append(lowered)
+
+    return sorted(emails)
+
 # --- ROUTES ---
 
 @app.route('/api/parse', methods=['POST'])
 def parse_text():
     """AI-Free Heuristic Parser (Smart Paste)"""
     raw_text = request.json.get('text', '')
-    email = next((word for word in raw_text.split() if '@' in word and '.' in word), None)
+    emails = extract_emails(raw_text)
+    email = emails[0] if emails else None
     
     if not email:
         return jsonify({"error": "No valid email found."}), 400
         
-    email = email.rstrip('.,;')
+    if '@' not in email:
+        return jsonify({"error": "Parsed email format is invalid."}), 400
+
     domain_part = email.split('@')[1]
     company_name = domain_part.split('.')[0].capitalize()
     
@@ -53,6 +99,52 @@ def parse_text():
         "target_name": guessed_name,
         "company_or_institute": company_name,
         "role": ""
+    })
+
+@app.route('/api/recruiters/parse-file', methods=['POST'])
+def parse_recruiters_file():
+    """Extract recruiter emails from uploaded CSV/TXT/DOCX files."""
+    uploaded_file = request.files.get('file')
+    if not uploaded_file:
+        return jsonify({"status": "error", "message": "No file uploaded."}), 400
+
+    filename = (uploaded_file.filename or '').lower()
+    content = ''
+    supported_extensions = ('.csv', '.txt', '.docx')
+
+    if filename and not filename.endswith(supported_extensions):
+        return jsonify({"status": "error", "message": "Unsupported file type. Please upload CSV, TXT, or DOCX."}), 400
+
+    try:
+        if filename.endswith('.csv'):
+            decoded = uploaded_file.read().decode('utf-8', errors='ignore')
+            csv_reader = csv.reader(io.StringIO(decoded))
+            content = '\n'.join(' '.join(row) for row in csv_reader)
+        elif filename.endswith('.txt'):
+            content = uploaded_file.read().decode('utf-8', errors='ignore')
+        elif filename.endswith('.docx'):
+            file_bytes = io.BytesIO(uploaded_file.read())
+            doc = Document(file_bytes)
+            paragraphs = [p.text for p in doc.paragraphs if p.text]
+            table_cells = []
+            for table in doc.tables:
+                for row in table.rows:
+                    table_cells.extend(cell.text for cell in row.cells if cell.text)
+            content = '\n'.join(paragraphs + table_cells)
+        else:
+            content = uploaded_file.read().decode('utf-8', errors='ignore')
+    except Exception:
+        app.logger.exception("Recruiter file parsing failed")
+        return jsonify({"status": "error", "message": "File parsing failed. The file may be corrupted or unreadable."}), 400
+
+    emails = extract_emails(content)
+    if not emails:
+        return jsonify({"status": "error", "message": "No recruiter emails found in file."}), 400
+
+    return jsonify({
+        "status": "success",
+        "emails": emails,
+        "count": len(emails)
     })
 
 @app.route('/api/smtp/add', methods=['POST'])
@@ -76,8 +168,9 @@ def add_smtp():
         }).execute()
 
         return jsonify({"status": "success", "message": "Account linked!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 401
+    except Exception:
+        app.logger.exception("SMTP account linking failed")
+        return jsonify({"status": "error", "message": "SMTP authentication failed. Verify email/app password and try again."}), 401
 
 @app.route('/api/campaign/send', methods=['POST'])
 def send_email():
@@ -130,8 +223,9 @@ def send_email():
 
         return jsonify({"status": "success", "message": "Email dispatched!"})
     
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception:
+        app.logger.exception("Email dispatch failed")
+        return jsonify({"status": "error", "message": "Dispatch failed due to server or SMTP error."}), 500
 
 if __name__ == '__main__':
     # Runs on port 5000 in Codespaces

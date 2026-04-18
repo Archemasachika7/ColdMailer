@@ -3,3 +3,4 @@ flask-cors
 supabase
 cryptography
 python-dotenv
+python-docx
