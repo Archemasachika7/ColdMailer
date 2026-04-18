@@ -84,8 +84,19 @@
 </head>
 <body class="flex h-screen overflow-hidden relative">
 
+  <!-- Mobile Top Nav -->
+  <header class="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[#060810] z-50 fixed w-full top-0">
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan);"></div>
+      <span class="syne font-bold text-white text-sm tracking-widest uppercase">The Architect</span>
+    </div>
+    <button onclick="document.getElementById('sidebarNav').classList.toggle('-translate-x-full')" class="text-white p-1">
+      <span class="material-symbols-outlined">menu</span>
+    </button>
+  </header>
+
   <!-- ── SIDEBAR ── -->
-  <nav class="hidden md:flex flex-col h-full w-60 shrink-0 py-6 z-40">
+  <nav id="sidebarNav" class="fixed inset-y-0 left-0 bg-[#060810] md:relative transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col h-full w-60 shrink-0 py-6 z-50 md:z-40 border-r border-[var(--border)] pt-20 md:pt-6">
     <div class="px-5 mb-8">
       <div class="flex items-center gap-2 mb-1">
         <div class="w-2 h-2 rounded-full" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan);"></div>
@@ -116,13 +127,21 @@
   </nav>
 
   <!-- ── MAIN ── -->
-  <main class="flex-1 overflow-y-auto p-6 relative z-10">
+  <main class="flex-1 overflow-y-auto p-6 pt-24 md:pt-6 relative z-10">
     <div class="max-w-6xl mx-auto space-y-5">
 
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-        <h1 class="syne text-2xl font-bold text-white tracking-wide">Sent Emails</h1>
-        
+          <h1 class="syne text-2xl font-bold text-white tracking-wide">Sent Emails</h1>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button id="checkRepliesBtn" onclick="checkReplies()" class="btn-ghost text-xs" style="display:flex;align-items:center;gap:6px;padding:7px 14px;">
+            <span class="material-symbols-outlined text-[14px]">mark_email_read</span>Check Replies
+          </button>
+          <button onclick="exportCsv()" class="btn-ghost text-xs" style="display:flex;align-items:center;gap:6px;padding:7px 14px;">
+            <span class="material-symbols-outlined text-[14px]">download</span>Export CSV
+          </button>
+        </div>
       </div>
 
       <!-- Stats row -->
@@ -166,6 +185,7 @@
       </div>
 
     </div>
+  </div>
   </main>
 
 <script>
@@ -181,14 +201,15 @@
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { window.location.replace('auth.html'); return; }
+    const userId = session.user.id;
 
-    const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', userId).single();
     const name = profile?.full_name || session.user.email.split('@')[0];
     document.getElementById('navUserName').textContent = name;
     document.getElementById('navUserEmail').textContent = session.user.email;
     renderNavAvatar(profile?.avatar_url, name);
 
-    await loadHistory();
+    await loadHistory(session.user.id);
   })();
 
   function renderNavAvatar(url, name) {
@@ -201,10 +222,11 @@
   }
   async function logout() { await sb.auth.signOut(); window.location.replace('auth.html'); }
 
-  async function loadHistory() {
-    console.log('[History] Fetching applications...');
-    const { data, error } = await sb.from('applications').select('*').order('created_at', { ascending: false });
-    console.log('[History] Result:', { data, error });
+  async function loadHistory(uid) {
+    const { data, error } = await sb.from('applications')
+      .select('*')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false });
     if (error) {
       console.error('History load error:', error);
       renderEmpty('Error: ' + (error.message || 'RLS policy blocking read. Run fix_applications_rls.sql in Supabase.'));
