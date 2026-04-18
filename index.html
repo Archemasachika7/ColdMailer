@@ -295,7 +295,7 @@
     .dropzone:hover { border-color: var(--cyan); background: var(--cyan-dim); }
     .dropzone.dragover { border-color: var(--cyan); background: rgba(0,242,255,0.1); }
 
-    /* Fix datetime-local picker visibility */
+    /* datetime-local dark theme fix */
     input[type="datetime-local"] {
       background: #0a0e16 !important;
       border: 1px solid rgba(0,242,255,0.18) !important;
@@ -310,22 +310,22 @@
     input[type="datetime-local"]:focus {
       border-color: rgba(0,242,255,0.5) !important;
       box-shadow: 0 0 0 3px rgba(0,242,255,0.07) !important;
+      outline: none !important;
     }
     input[type="datetime-local"]::-webkit-calendar-picker-indicator {
       filter: invert(0.7) sepia(1) saturate(3) hue-rotate(150deg);
-      cursor: pointer; opacity: 0.7;
+      cursor: pointer; opacity: 0.8;
     }
-    input[type="datetime-local"]::-webkit-datetime-edit { color: #c9d1d9; }
+    input[type="datetime-local"]::-webkit-datetime-edit,
     input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper { color: #c9d1d9; }
-    input[type="datetime-local"]::-webkit-datetime-edit-text { color: var(--text-dim); }
+    input[type="datetime-local"]::-webkit-datetime-edit-text { color: rgba(88,166,166,0.6); }
     input[type="datetime-local"]::-webkit-datetime-edit-month-field,
     input[type="datetime-local"]::-webkit-datetime-edit-day-field,
     input[type="datetime-local"]::-webkit-datetime-edit-year-field,
     input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
     input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
     input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
-      color: #c9d1d9 !important;
-      background: transparent !important;
+      color: #c9d1d9 !important; background: transparent !important;
     }
     input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
     input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus,
@@ -334,9 +334,10 @@
     input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus,
     input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
       background: rgba(0,242,255,0.15) !important;
-      color: #ffffff !important;
-      border-radius: 2px;
+      color: #fff !important; border-radius: 2px;
     }
+    #scheduledCountDisplay { background: rgba(0,242,255,0.04); border: 1px solid var(--border); border-radius: 3px; padding: 8px 12px; }
+
   </style>
 </head>
 <body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
@@ -564,14 +565,18 @@
             <div class="panel-header">
               <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Schedule Send</span>
               <div class="flex items-center gap-2">
-                <span class="badge badge-cyan" style="font-size:9px;">Optional</span>
-                <button onclick="runScheduled()" id="runScheduledBtn" class="btn-ghost" style="padding:4px 10px;font-size:10px;" title="Send all pending scheduled emails now">Run pending</button>
+                <div id="clockDisplay" class="mono text-[10px]" style="color:var(--cyan);"></div>
+                <span class="badge badge-cyan" style="font-size:9px;">IST</span>
               </div>
             </div>
-            <div class="p-4">
+            <div class="p-4 space-y-3">
               <input type="datetime-local" id="sendAt"/>
-              <div id="scheduledCount" class="mono text-[10px] mt-2" style="color:var(--cyan);display:none;"></div>
-              <div class="mono text-[10px] mt-2" style="color:var(--text-dim);">Leave blank to send immediately. Set a time to queue it.</div>
+              <div id="scheduledCountDisplay" style="display:none;" class="flex items-center gap-2 p-2 rounded" style="background:rgba(0,242,255,0.05);border:1px solid var(--border);">
+                <span class="spinner" style="width:10px;height:10px;border-width:1.5px;"></span>
+                <span id="scheduledCountText" class="mono text-[10px]" style="color:var(--cyan);"></span>
+                <button onclick="cancelSchedule()" class="mono text-[10px]" style="color:var(--red);background:none;border:none;cursor:pointer;margin-left:auto;">Cancel</button>
+              </div>
+              <p class="mono text-[10px]" style="color:var(--text-dim);">Leave blank to send now. Pick a time to auto-send — tab stays open or use the app.</p>
             </div>
           </div>
 
@@ -726,7 +731,8 @@ Thanks for your time,
 
     // Set default template
     switchTemplate('Industry');
-    loadScheduledCount();
+    startClock();
+    await checkPendingOnLoad();
   })();
 
   function renderNavAvatar(url, name) {
@@ -1067,8 +1073,8 @@ Thanks for your time,
       const result = await res.json();
       if (result.status === 'success' || result.status === 'scheduled') {
         if (result.status === 'scheduled') {
-          showToast('Email scheduled. Hit "Run pending" when ready to send.', 'success');
-          await loadScheduledCount();
+          showToast('Scheduled! Will auto-send at the chosen time.', 'success');
+          startScheduleWatcher();
         } else {
           showToast(resumeFile ? 'Email sent with CV attached.' : 'Email sent.', 'success');
         }
@@ -1085,47 +1091,169 @@ Thanks for your time,
   }
 
 
-  // ── Scheduled jobs ─────────────────────────────────────────────
-  async function loadScheduledCount() {
-    try {
-      const { data } = await sb.from('scheduled_jobs')
-        .select('id')
-        .eq('user_id', currentUserId)
-        .eq('status', 'pending');
-      const count = data?.length || 0;
-      const el = document.getElementById('scheduledCount');
-      if (count > 0) {
-        el.style.display = 'block';
-        el.textContent = `↻ ${count} email${count !== 1 ? 's' : ''} queued — hit "Run pending" to send now`;
-      } else {
-        el.style.display = 'none';
-      }
-    } catch(e) { /* silently fail */ }
+  // ═══════════════════════════════════════════════════════════
+  // AUTO SCHEDULER — watches the clock in IST, fires at chosen time
+  // ═══════════════════════════════════════════════════════════
+
+  let scheduleWatcherInterval = null;
+  let scheduledSendAtISO = null;  // UTC ISO string of when to fire
+
+  // Live IST clock in the panel header
+  function startClock() {
+    function tick() {
+      const now = new Date();
+      const ist = new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+      }).format(now);
+      const el = document.getElementById('clockDisplay');
+      if (el) el.textContent = ist + ' IST';
+    }
+    tick();
+    setInterval(tick, 1000);
   }
 
-  async function runScheduled() {
-    const btn = document.getElementById('runScheduledBtn');
-    if (!btn) return;
-    btn.disabled = true;
-    btn.textContent = '...';
+  // Called after a successful schedule save — starts watching
+  function startScheduleWatcher() {
+    const sendAtVal = document.getElementById('sendAt').value;
+    if (!sendAtVal) return;
+
+    // sendAt is local datetime string e.g. "2025-04-18T14:30"
+    // Browser treats datetime-local as LOCAL time (IST on user's machine)
+    const sendAtMs = new Date(sendAtVal).getTime(); // converts local → UTC ms
+    scheduledSendAtISO = new Date(sendAtVal).toISOString();
+
+    // Show the waiting indicator
+    showScheduleCountdown(sendAtMs);
+
+    // Clear any existing watcher
+    if (scheduleWatcherInterval) clearInterval(scheduleWatcherInterval);
+
+    // Check every 15 seconds
+    scheduleWatcherInterval = setInterval(async () => {
+      const nowMs = Date.now();
+      if (nowMs >= sendAtMs) {
+        clearInterval(scheduleWatcherInterval);
+        scheduleWatcherInterval = null;
+        hideScheduleCountdown();
+        showToast('Scheduled time reached — sending now...', 'success');
+        await triggerScheduledSend();
+      } else {
+        showScheduleCountdown(sendAtMs);
+      }
+    }, 15000);
+
+    // Also do an immediate check in 5s (in case time was very close)
+    setTimeout(async () => {
+      if (Date.now() >= sendAtMs && scheduleWatcherInterval) {
+        clearInterval(scheduleWatcherInterval);
+        scheduleWatcherInterval = null;
+        hideScheduleCountdown();
+        showToast('Scheduled time reached — sending now...', 'success');
+        await triggerScheduledSend();
+      }
+    }, 5000);
+  }
+
+  function showScheduleCountdown(sendAtMs) {
+    const el = document.getElementById('scheduledCountDisplay');
+    const txt = document.getElementById('scheduledCountText');
+    if (!el || !txt) return;
+    el.style.display = 'flex';
+
+    const diffMs = sendAtMs - Date.now();
+    if (diffMs <= 0) { txt.textContent = 'Sending now...'; return; }
+
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffSec = Math.floor((diffMs % 60000) / 1000);
+    const sendStr = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit', minute: '2-digit', hour12: true
+    }).format(new Date(sendAtMs));
+
+    txt.textContent = diffMin > 0
+      ? `Sends at ${sendStr} IST — ${diffMin}m ${diffSec}s away`
+      : `Sends at ${sendStr} IST — ${diffSec}s away`;
+  }
+
+  function hideScheduleCountdown() {
+    const el = document.getElementById('scheduledCountDisplay');
+    if (el) el.style.display = 'none';
+    document.getElementById('sendAt').value = '';
+    scheduledSendAtISO = null;
+  }
+
+  function cancelSchedule() {
+    if (scheduleWatcherInterval) {
+      clearInterval(scheduleWatcherInterval);
+      scheduleWatcherInterval = null;
+    }
+    hideScheduleCountdown();
+    showToast('Schedule cancelled.', 'success');
+    // Mark pending job as cancelled in DB
+    if (scheduledSendAtISO && currentUserId) {
+      sb.from('scheduled_jobs')
+        .update({ status: 'cancelled' })
+        .eq('user_id', currentUserId)
+        .eq('status', 'pending')
+        .execute().catch(() => {});
+    }
+  }
+
+  async function triggerScheduledSend() {
     try {
       const res = await fetch('/api/scheduled/run', { method: 'POST' });
       const d = await res.json();
-      if (d.status === 'done') {
-        if (d.sent > 0) {
-          showToast(`Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''}${d.failed > 0 ? ', ' + d.failed + ' failed' : ''}.`, 'success');
-        } else if (d.failed > 0) {
-          showToast(`${d.failed} job(s) failed. Check SMTP credentials.`, 'error');
-        } else {
-          showToast('No pending emails due right now.', 'success');
-        }
+      if (d.sent > 0) {
+        showToast(`✓ Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''} successfully.`, 'success');
         await loadSmtpAccounts();
-        await loadScheduledCount();
+      } else if (d.failed > 0) {
+        showToast(`Scheduled send failed. Check SMTP credentials.`, 'error');
       } else {
-        showToast(d.message || 'Failed to run scheduled jobs.', 'error');
+        showToast('No pending emails found — may have already sent.', 'success');
       }
-    } catch(e) { showToast('Could not reach server.', 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Run pending'; }
+    } catch(e) {
+      showToast('Auto-send failed — server unreachable. Try "Run pending".', 'error');
+    }
+  }
+
+  // Re-attach watcher on page load if there are pending jobs
+  async function checkPendingOnLoad() {
+    if (!currentUserId) return;
+    const { data } = await sb.from('scheduled_jobs')
+      .select('id, send_at')
+      .eq('user_id', currentUserId)
+      .eq('status', 'pending')
+      .order('send_at', { ascending: true })
+      .limit(1);
+
+    if (data && data.length > 0) {
+      const job = data[0];
+      const sendAtMs = new Date(job.send_at).getTime();
+      const nowMs = Date.now();
+      if (sendAtMs > nowMs) {
+        // Still in the future — restore the watcher
+        scheduledSendAtISO = job.send_at;
+        showScheduleCountdown(sendAtMs);
+        if (scheduleWatcherInterval) clearInterval(scheduleWatcherInterval);
+        scheduleWatcherInterval = setInterval(async () => {
+          if (Date.now() >= sendAtMs) {
+            clearInterval(scheduleWatcherInterval);
+            scheduleWatcherInterval = null;
+            hideScheduleCountdown();
+            showToast('Scheduled time reached — sending now...', 'success');
+            await triggerScheduledSend();
+          } else {
+            showScheduleCountdown(sendAtMs);
+          }
+        }, 15000);
+      } else {
+        // Overdue — fire immediately
+        showToast('Found overdue scheduled email — sending now...', 'success');
+        await triggerScheduledSend();
+      }
+    }
   }
 
   // ── Toast ─────────────────────────────────────────────────────
