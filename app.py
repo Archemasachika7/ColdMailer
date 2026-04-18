@@ -2,7 +2,6 @@ import os
 import smtplib
 import csv
 import io
-import re
 from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -34,11 +33,45 @@ TEMPLATES = {
     "Custom": "Hi {target_name},\n\n{custom_text}\n\nBest,\n{user_name}"
 }
 
-EMAIL_REGEX = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+ALLOWED_LOCAL_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._%+-")
+ALLOWED_DOMAIN_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
+
+def is_valid_email_candidate(candidate):
+    if not candidate or candidate.count('@') != 1:
+        return False
+    local_part, domain_part = candidate.split('@')
+    if not local_part or not domain_part or '.' not in domain_part:
+        return False
+    if any(ch not in ALLOWED_LOCAL_CHARS for ch in local_part):
+        return False
+    if any(ch not in ALLOWED_DOMAIN_CHARS for ch in domain_part):
+        return False
+    if domain_part.startswith('.') or domain_part.endswith('.') or '..' in domain_part:
+        return False
+    return True
 
 def extract_emails(text):
-    emails = EMAIL_REGEX.findall(text or "")
-    return sorted(set(email.rstrip('.,;:').lower() for email in emails))
+    if not text:
+        return []
+
+    separators = " \n\r\t,;<>\"'()[]{}"
+    normalized_text = text
+    for sep in separators:
+        normalized_text = normalized_text.replace(sep, ' ')
+
+    candidates = normalized_text.split()
+    emails = []
+    seen = set()
+
+    for token in candidates:
+        candidate = token.strip().strip(".:!?,")
+        if is_valid_email_candidate(candidate):
+            lowered = candidate.lower()
+            if lowered not in seen:
+                seen.add(lowered)
+                emails.append(lowered)
+
+    return sorted(emails)
 
 # --- ROUTES ---
 
@@ -52,7 +85,6 @@ def parse_text():
     if not email:
         return jsonify({"error": "No valid email found."}), 400
         
-    email = email.rstrip('.,;')
     domain_part = email.split('@')[1]
     company_name = domain_part.split('.')[0].capitalize()
     
@@ -96,8 +128,9 @@ def parse_recruiters_file():
         else:
             fallback_text = uploaded_file.read().decode('utf-8', errors='ignore')
             content = fallback_text
-    except Exception as exc:
-        return jsonify({"status": "error", "message": f"Failed to parse file: {str(exc)}"}), 400
+    except Exception:
+        app.logger.exception("Recruiter file parsing failed")
+        return jsonify({"status": "error", "message": "Failed to parse file. Use a valid CSV, TXT, or DOCX file."}), 400
 
     emails = extract_emails(content)
     if not emails:
@@ -130,8 +163,9 @@ def add_smtp():
         }).execute()
 
         return jsonify({"status": "success", "message": "Account linked!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 401
+    except Exception:
+        app.logger.exception("SMTP account linking failed")
+        return jsonify({"status": "error", "message": "SMTP authentication failed. Verify email/app password and try again."}), 401
 
 @app.route('/api/campaign/send', methods=['POST'])
 def send_email():
@@ -184,8 +218,9 @@ def send_email():
 
         return jsonify({"status": "success", "message": "Email dispatched!"})
     
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception:
+        app.logger.exception("Email dispatch failed")
+        return jsonify({"status": "error", "message": "Dispatch failed due to server or SMTP error."}), 500
 
 if __name__ == '__main__':
     # Runs on port 5000 in Codespaces
