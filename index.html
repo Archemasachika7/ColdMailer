@@ -203,11 +203,13 @@
                 if (data.emails.length > 0 && !document.getElementById('targetEmail').value) {
                     const firstEmail = data.emails[0];
                     document.getElementById('targetEmail').value = firstEmail;
-                    const localPart = firstEmail.split('@')[0];
-                    const genericLocals = ['info', 'contact', 'hello', 'noreply', 'no-reply', 'support', 'admin', 'hr', 'careers'];
-                    if (!genericLocals.includes(localPart.toLowerCase()) && /[._]/.test(localPart)) {
-                        const guessedName = localPart.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                        document.getElementById('targetName').value = guessedName;
+                    if (firstEmail.includes('@')) {
+                        const localPart = firstEmail.split('@')[0];
+                        const genericLocals = ['info', 'contact', 'hello', 'noreply', 'no-reply', 'support', 'admin', 'hr', 'careers'];
+                        if (!genericLocals.includes(localPart.toLowerCase()) && /[._]/.test(localPart)) {
+                            const guessedName = localPart.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                            document.getElementById('targetName').value = guessedName;
+                        }
                     }
                 }
             } catch (error) {

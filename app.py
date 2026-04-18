@@ -85,6 +85,9 @@ def parse_text():
     if not email:
         return jsonify({"error": "No valid email found."}), 400
         
+    if '@' not in email:
+        return jsonify({"error": "Parsed email format is invalid."}), 400
+
     domain_part = email.split('@')[1]
     company_name = domain_part.split('.')[0].capitalize()
     
@@ -107,13 +110,16 @@ def parse_recruiters_file():
 
     filename = (uploaded_file.filename or '').lower()
     content = ''
+    supported_extensions = ('.csv', '.txt', '.docx')
+
+    if filename and not filename.endswith(supported_extensions):
+        return jsonify({"status": "error", "message": "Unsupported file type. Please upload CSV, TXT, or DOCX."}), 400
 
     try:
         if filename.endswith('.csv'):
             decoded = uploaded_file.read().decode('utf-8', errors='ignore')
             csv_reader = csv.reader(io.StringIO(decoded))
-            rows = [' '.join(row) for row in csv_reader]
-            content = '\n'.join(rows)
+            content = '\n'.join(' '.join(row) for row in csv_reader)
         elif filename.endswith('.txt'):
             content = uploaded_file.read().decode('utf-8', errors='ignore')
         elif filename.endswith('.docx'):
@@ -126,11 +132,10 @@ def parse_recruiters_file():
                     table_cells.extend(cell.text for cell in row.cells if cell.text)
             content = '\n'.join(paragraphs + table_cells)
         else:
-            fallback_text = uploaded_file.read().decode('utf-8', errors='ignore')
-            content = fallback_text
+            content = uploaded_file.read().decode('utf-8', errors='ignore')
     except Exception:
         app.logger.exception("Recruiter file parsing failed")
-        return jsonify({"status": "error", "message": "Failed to parse file. Use a valid CSV, TXT, or DOCX file."}), 400
+        return jsonify({"status": "error", "message": "File parsing failed. The file may be corrupted or unreadable."}), 400
 
     emails = extract_emails(content)
     if not emails:
