@@ -294,6 +294,56 @@
     }
     .dropzone:hover { border-color: var(--cyan); background: var(--cyan-dim); }
     .dropzone.dragover { border-color: var(--cyan); background: rgba(0,242,255,0.1); }
+
+    /* Fix datetime-local picker visibility */
+    input[type="datetime-local"] {
+      background: #0a0e16 !important;
+      border: 1px solid rgba(0,242,255,0.18) !important;
+      border-radius: 3px !important;
+      color: #c9d1d9 !important;
+      font-family: 'IBM Plex Mono', monospace !important;
+      font-size: 12px !important;
+      color-scheme: dark !important;
+      padding: 9px 12px !important;
+      width: 100% !important;
+    }
+    input[type="datetime-local"]:focus {
+      border-color: rgba(0,242,255,0.5) !important;
+      box-shadow: 0 0 0 3px rgba(0,242,255,0.07) !important;
+      outline: none !important;
+    }
+    /* Chrome/Edge — the calendar icon and inner text */
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.7) sepia(1) saturate(3) hue-rotate(150deg);
+      cursor: pointer;
+      opacity: 0.7;
+    }
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+      opacity: 1;
+    }
+    /* The date/time segments inside the input */
+    input[type="datetime-local"]::-webkit-datetime-edit { color: #c9d1d9; }
+    input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper { color: #c9d1d9; }
+    input[type="datetime-local"]::-webkit-datetime-edit-text { color: var(--text-dim); }
+    input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
+      color: #c9d1d9 !important;
+      background: transparent !important;
+    }
+    input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
+    input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus,
+    input[type="datetime-local"]::-webkit-datetime-edit-year-field:focus,
+    input[type="datetime-local"]::-webkit-datetime-edit-hour-field:focus,
+    input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus,
+    input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
+      background: rgba(0,242,255,0.15) !important;
+      color: #ffffff !important;
+      border-radius: 2px;
+    }
   </style>
 </head>
 <body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
@@ -520,16 +570,10 @@
           <div class="panel">
             <div class="panel-header">
               <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Schedule Send</span>
-              <div class="flex items-center gap-2">
-                <span class="badge badge-cyan" style="font-size: 9px;">Optional</span>
-                <button onclick="runScheduled()" id="runScheduledBtn" class="btn-ghost" style="padding:4px 10px;font-size:10px;" title="Send all pending scheduled emails now">
-                  Run pending
-                </button>
-              </div>
+              <span class="badge badge-cyan" style="font-size: 9px;">Optional</span>
             </div>
             <div class="p-4">
-              <input type="datetime-local" id="sendAt" style="padding:9px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color-scheme: dark;"/>
-              <div id="scheduledCount" class="mono text-[10px] mt-2" style="color:var(--text-dim); display:none;"></div>
+              <input type="datetime-local" id="sendAt" style="padding:9px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color-scheme: dark; background:#0a0e16 !important; border:1px solid rgba(0,242,255,0.18) !important; border-radius:3px; color:#c9d1d9 !important; width:100%;"/>
             </div>
           </div>
 
@@ -684,7 +728,6 @@ Thanks for your time,
 
     // Set default template
     switchTemplate('Industry');
-    await loadScheduledCount();
   })();
 
   function renderNavAvatar(url, name) {
@@ -1036,42 +1079,6 @@ Thanks for your time,
       btn.disabled = false;
       document.getElementById('dispatchBtnInner').innerHTML = `<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>Send Email`;
     }
-  }
-
-
-  // ── Scheduled jobs ────────────────────────────────────────────
-  async function loadScheduledCount() {
-    const { data } = await sb.from('scheduled_jobs')
-      .select('id', { count: 'exact' })
-      .eq('user_id', currentUserId)
-      .eq('status', 'pending');
-    const count = data?.length || 0;
-    const el = document.getElementById('scheduledCount');
-    if (count > 0) {
-      el.style.display = 'block';
-      el.textContent = `${count} email${count !== 1 ? 's' : ''} scheduled and waiting to send`;
-    } else {
-      el.style.display = 'none';
-    }
-  }
-
-  async function runScheduled() {
-    const btn = document.getElementById('runScheduledBtn');
-    btn.disabled = true;
-    btn.textContent = '...';
-    try {
-      const res = await fetch('/api/scheduled/run', { method: 'POST' });
-      const d = await res.json();
-      if (d.status === 'done') {
-        showToast(`Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''}${d.failed > 0 ? ', ' + d.failed + ' failed' : ''}.`,
-                  d.sent > 0 ? 'success' : 'error');
-        await loadSmtpAccounts();
-        await loadScheduledCount();
-      } else {
-        showToast(d.message || 'Failed to run scheduled jobs.', 'error');
-      }
-    } catch(e) { showToast('Could not reach server.', 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Run pending'; }
   }
 
   // ── Toast ─────────────────────────────────────────────────────
