@@ -198,7 +198,7 @@ def parse_text():
 
 
 # ---------------------------------------------------------------------------
-# File parser  (CSV / TXT / DOCX — returns emails + best-guess names)
+# File parser  (CSV / TXT / DOCX — returns full pairs: email, name, company, role)
 # ---------------------------------------------------------------------------
 @app.route('/api/recruiters/parse-file', methods=['POST'])
 def parse_recruiters_file():
@@ -210,59 +210,109 @@ def parse_recruiters_file():
     if filename and not filename.endswith(('.csv', '.txt', '.docx')):
         return jsonify({"status": "error", "message": "Unsupported file type. Use CSV, TXT, or DOCX."}), 400
 
+    def find_col(headers, keywords):
+        for i, h in enumerate(headers):
+            if any(k in h for k in keywords):
+                return i
+        return None
+
     try:
         if filename.endswith('.csv'):
-            decoded    = uploaded_file.read().decode('utf-8', errors='ignore')
-            rows       = list(csv.reader(io.StringIO(decoded)))
-            # Try to detect name column
-            headers    = [h.lower().strip() for h in rows[0]] if rows else []
-            name_col   = next((i for i, h in enumerate(headers) if 'name' in h), None)
-            email_col  = next((i for i, h in enumerate(headers) if 'email' in h or 'mail' in h), None)
-            content    = '\n'.join(' '.join(row) for row in rows)
+            decoded = uploaded_file.read().decode('utf-8', errors='ignore')
+            rows    = list(csv.reader(io.StringIO(decoded)))
+            if not rows:
+                return jsonify({"status": "error", "message": "CSV file is empty."}), 400
 
-            # Build structured pairs if columns found
+            headers     = [h.lower().strip() for h in rows[0]]
+            email_col   = find_col(headers, ['email', 'mail'])
+            name_col    = find_col(headers, ['name'])
+            company_col = find_col(headers, ['company', 'organisation', 'organization', 'institute', 'employer'])
+            role_col    = find_col(headers, ['role', 'position', 'title', 'job', 'designation'])
+
             pairs = []
-            if name_col is not None and email_col is not None:
+            if email_col is not None:
                 for row in rows[1:]:
-                    if len(row) > max(name_col, email_col):
-                        e = row[email_col].strip()
-                        n = row[name_col].strip()
-                        if is_valid_email(e):
-                            pairs.append({"email": e.lower(), "name": n})
+                    if len(row) <= email_col:
+                        continue
+                    e = row[email_col].strip()
+                    if not is_valid_email(e):
+                        continue
+                    n = row[name_col].strip()    if name_col    is not None and len(row) > name_col    else ''
+                    c = row[company_col].strip() if company_col is not None and len(row) > company_col else ''
+                    r = row[role_col].strip()    if role_col    is not None and len(row) > role_col    else ''
+                    if not n:
+                        n = e.split('@')[0].replace('.', ' ').replace('_', ' ').title()
+                    pairs.append({"email": e.lower(), "name": n, "company": c, "role": r})
 
             if pairs:
                 return jsonify({"status": "success", "pairs": pairs,
                                 "emails": [p['email'] for p in pairs],
                                 "count": len(pairs)})
+            content = '\n'.join(' '.join(row) for row in rows)
+
+        elif filename.endswith('.docx'):
+            doc = Document(io.BytesIO(uploaded_file.read()))
+
+            # Try structured tables first
+            table_pairs = []
+            for table in doc.tables:
+                if not table.rows:
+                    continue
+                hdr = [c.text.lower().strip() for c in table.rows[0].cells]
+                ec = find_col(hdr, ['email', 'mail'])
+                nc = find_col(hdr, ['name'])
+                cc = find_col(hdr, ['company', 'organisation', 'organization', 'institute'])
+                rc = find_col(hdr, ['role', 'position', 'title', 'job'])
+                if ec is not None:
+                    for row in table.rows[1:]:
+                        cells = [c.text.strip() for c in row.cells]
+                        if ec >= len(cells):
+                            continue
+                        e = cells[ec]
+                        if not is_valid_email(e):
+                            continue
+                        n = cells[nc] if nc is not None and nc < len(cells) else ''
+                        c = cells[cc] if cc is not None and cc < len(cells) else ''
+                        r = cells[rc] if rc is not None and rc < len(cells) else ''
+                        if not n:
+                            n = e.split('@')[0].replace('.', ' ').replace('_', ' ').title()
+                        table_pairs.append({"email": e.lower(), "name": n, "company": c, "role": r})
+
+            if table_pairs:
+                return jsonify({"status": "success", "pairs": table_pairs,
+                                "emails": [p['email'] for p in table_pairs],
+                                "count": len(table_pairs)})
+
+            paragraphs = [p.text for p in doc.paragraphs if p.text]
+            cells      = [c.text for t in doc.tables for rw in t.rows for c in rw.cells if c.text]
+            content    = '\n'.join(paragraphs + cells)
+
         elif filename.endswith('.txt'):
             content = uploaded_file.read().decode('utf-8', errors='ignore')
-        elif filename.endswith('.docx'):
-            doc        = Document(io.BytesIO(uploaded_file.read()))
-            paragraphs = [p.text for p in doc.paragraphs if p.text]
-            cells      = [c.text for t in doc.tables for r in t.rows for c in r.cells if c.text]
-            content    = '\n'.join(paragraphs + cells)
         else:
             content = uploaded_file.read().decode('utf-8', errors='ignore')
+
     except Exception:
         app.logger.exception("File parsing failed")
-        return jsonify({"status": "error", "message": "File parsing failed."}), 400
+        return jsonify({"status": "error", "message": "File parsing failed. Check the file format."}), 400
 
+    # Free-text fallback
     emails = extract_emails(content)
     if not emails:
-        return jsonify({"status": "error", "message": "No emails found in file."}), 400
+        return jsonify({"status": "error", "message": "No valid email addresses found in the file."}), 400
 
-    # For non-CSV, try to pair each email with a name from surrounding text
     pairs = []
     lines = content.split('\n')
     for em in emails:
-        # Look in the line containing this email and ±1 lines for a name
         context = ""
         for i, line in enumerate(lines):
             if em in line.lower():
-                context = '\n'.join(lines[max(0,i-1):i+2])
+                context = '\n'.join(lines[max(0, i-1):i+2])
                 break
         name = extract_name_from_text(context, fallback_email=em)
-        pairs.append({"email": em, "name": name})
+        domain_part   = em.split('@')[1]
+        company_guess = domain_part.split('.')[0].capitalize() if domain_part else ''
+        pairs.append({"email": em, "name": name, "company": company_guess, "role": ""})
 
     return jsonify({"status": "success", "pairs": pairs,
                     "emails": emails, "count": len(emails)})
