@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dispatch History — The Architect</title>
+  <title>Sent Emails — The Architect</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -61,6 +61,9 @@
     .badge-industry { color: #a78bfa; border-color: rgba(167,139,250,0.25); background: rgba(167,139,250,0.06); }
     .badge-research { color: #34d399; border-color: rgba(52,211,153,0.25); background: rgba(52,211,153,0.06); }
     .badge-custom { color: #fbbf24; border-color: rgba(251,191,36,0.25); background: rgba(251,191,36,0.06); }
+    .badge-replied { color: #34d399; border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.07); }
+    .badge-none    { color: var(--text-dim); border-color: var(--border); background: transparent; }
+    .badge-scheduled { color: #f59e0b; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.07); }
 
     /* Search / filter */
     .search-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
@@ -76,6 +79,7 @@
     .page-btn:hover { border-color: var(--cyan); color: var(--cyan); }
     .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .page-btn.current { border-color: var(--cyan); color: var(--cyan); background: rgba(0,242,255,0.07); }
+      @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="flex h-screen overflow-hidden relative">
@@ -84,10 +88,10 @@
   <nav class="hidden md:flex flex-col h-full w-60 shrink-0 py-6 z-40">
     <div class="px-5 mb-8">
       <div class="flex items-center gap-2 mb-1">
-        <div class="w-2 h-2 rounded-full" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s infinite;"></div>
+        <div class="w-2 h-2 rounded-full" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan);"></div>
         <span class="syne font-bold text-white text-base tracking-widest uppercase">The Architect</span>
       </div>
-      <div class="mono text-[10px] tracking-[0.15em] ml-4" style="color:var(--text-dim);">// DISPATCH SYSTEM</div>
+      <div class="mono text-[10px] tracking-[0.15em] ml-4" style="color:var(--text-dim);">Your send history</div>
     </div>
     <div class="px-4 mb-6">
       <div class="flex items-center gap-3 px-3 py-3 rounded-md" style="background:rgba(0,242,255,0.04);border:1px solid var(--border);">
@@ -99,14 +103,14 @@
       </div>
     </div>
     <div class="flex-1 px-3 space-y-1">
-      <a href="index.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">rocket_launch</span> Dispatch</a>
-      <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> SMTP Nodes</a>
+      <a href="index.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">rocket_launch</span> Send</a>
+      <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> Email Accounts</a>
       <a href="history.html" class="nav-link active"><span class="material-symbols-outlined text-[18px]">history</span> History</a>
       <a href="profile.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">person</span> Profile</a>
     </div>
     <div class="px-3 mt-4 pt-4" style="border-top:1px solid var(--border);">
       <button onclick="logout()" class="nav-link" style="color:var(--red);">
-        <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Terminate
+        <span class="material-symbols-outlined text-[18px]">logout</span> Log out
       </button>
     </div>
   </nav>
@@ -115,9 +119,10 @@
   <main class="flex-1 overflow-y-auto p-6 relative z-10">
     <div class="max-w-6xl mx-auto space-y-5">
 
-      <div>
-        <h1 class="syne text-2xl font-bold text-white tracking-wide">Dispatch History</h1>
-        <p class="mono text-[11px] mt-1 tracking-widest" style="color:var(--text-dim);">// ALL SENT APPLICATIONS LOG</p>
+      <div class="flex items-center justify-between">
+        <div>
+        <h1 class="syne text-2xl font-bold text-white tracking-wide">Sent Emails</h1>
+        
       </div>
 
       <!-- Stats row -->
@@ -145,7 +150,7 @@
               <th>Role</th>
               <th>Template</th>
               <th>Status</th>
-              <th>Sent At</th>
+              <th>Reply</th><th>Sent At</th>
             </tr>
           </thead>
           <tbody id="historyBody">
@@ -211,7 +216,7 @@
       document.getElementById('statToday').textContent = '0';
       document.getElementById('statCompanies').textContent = '0';
       document.getElementById('statTemplates').textContent = '0';
-      renderEmpty('No emails dispatched yet. Send your first one from the Dispatch page.');
+      renderEmpty('Nothing sent yet. Head to the Send page to send your first email.');
       return;
     }
     allRows = data;
@@ -247,7 +252,7 @@
     document.getElementById('countLabel').textContent = `${filtered.length} record${filtered.length!==1?'s':''}`;
 
     if (filtered.length === 0) {
-      renderEmpty('No records found.');
+      renderEmpty('No results match your search.');
       return;
     }
 
@@ -256,7 +261,11 @@
 
     tbody.innerHTML = page.map(r => {
       const tmplClass = { Industry: 'badge-industry', Research: 'badge-research', Custom: 'badge-custom' }[r.template_used] || 'badge-custom';
-      const dateStr = r.sent_at ? new Date(r.created_at).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' }) : '—';
+      const dateStr = r.created_at ? new Date(r.created_at).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' }) : '—';
+      const replyStatus = r.reply_status || 'none';
+      const replyBadge = replyStatus === 'replied'
+        ? '<span class="badge badge-replied">↩ Replied</span>'
+        : '<span class="badge badge-none">—</span>';
       return `
         <tr>
           <td>
@@ -267,6 +276,7 @@
           <td class="mono-cell text-[12px]" style="color:var(--text-dim);">${escHtml(r.role || '—')}</td>
           <td><span class="badge ${tmplClass}">${escHtml(r.template_used || '—')}</span></td>
           <td><span class="badge badge-sent">✓ ${escHtml(r.status || 'Sent')}</span></td>
+          <td>${replyBadge}</td>
           <td class="mono-cell text-[11px]" style="color:var(--text-dim); white-space:nowrap;">${dateStr}</td>
         </tr>
       `;
@@ -301,6 +311,55 @@
         </div>
       </td></tr>`;
   }
+
+  // ── Export CSV ────────────────────────────────────────────────
+  async function exportCsv() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const url = `${API_BASE_URL || ''}/api/export/csv?user_id=${session.user.id}`;
+    const a = document.createElement('a');
+    a.href = url; a.download = 'sent_emails.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  // ── Check Replies ─────────────────────────────────────────────
+  async function checkReplies() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+
+    // Need an SMTP account to check IMAP
+    const { data: accounts } = await sb.from('smtp_configs').select('id,email_address').limit(1);
+    if (!accounts || accounts.length === 0) {
+      showToast('No email accounts configured.', 'error'); return;
+    }
+    const btn = document.getElementById('checkRepliesBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(0,242,255,0.2);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.65s linear infinite;margin-right:6px;"></span>Checking...';
+
+    try {
+      const res = await fetch('/api/replies/check', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ user_id: session.user.id, smtp_config_id: accounts[0].id })
+      });
+      const d = await res.json();
+      if (d.status === 'ok') {
+        const msg = d.replies_found > 0
+          ? `${d.replies_found} new repl${d.replies_found===1?'y':'ies'} found!`
+          : 'No new replies.';
+        showToast(msg, d.replies_found > 0 ? 'success' : 'success');
+        if (d.replies_found > 0) await loadHistory();
+      } else {
+        showToast(d.message || 'Check failed.', 'error');
+      }
+    } catch(e) { showToast('Could not reach server.', 'error'); }
+    finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-outlined text-[14px] align-middle mr-1">mark_email_read</span>Check replies';
+    }
+  }
+
+  const API_BASE_URL = '';
+
   function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
