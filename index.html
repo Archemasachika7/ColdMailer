@@ -298,8 +298,19 @@
 </head>
 <body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
 
+  <!-- Mobile Top Nav -->
+  <header class="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[#060810] z-50 fixed w-full top-0">
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]" ></div>
+      <span class="syne font-bold text-white text-sm tracking-widest uppercase">The Architect</span>
+    </div>
+    <button onclick="document.getElementById('sidebarNav').classList.toggle('-translate-x-full')" class="text-white p-1">
+      <span class="material-symbols-outlined">menu</span>
+    </button>
+  </header>
+
   <!-- ── SIDEBAR NAV ─────────────────────────── -->
-  <nav class="hidden md:flex flex-col h-full w-60 shrink-0 py-6 z-40">
+  <nav id="sidebarNav" class="fixed inset-y-0 left-0 bg-[#060810] md:relative transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col h-full w-60 shrink-0 py-6 z-50 md:z-40 border-r border-[var(--border)] pt-20 md:pt-6">
     <!-- Brand -->
     <div class="px-5 mb-8">
       <div class="flex items-center gap-2 mb-1">
@@ -313,9 +324,9 @@
     <div class="px-4 mb-6">
       <div class="flex items-center gap-3 px-3 py-3 rounded-md" style="background:rgba(0,242,255,0.04); border:1px solid var(--border);">
         <div id="navAvatarWrap"></div>
-        <div class="overflow-hidden">
+        <div class="overflow-hidden max-w-[130px]">
           <div id="navUserName" class="text-sm font-semibold text-white truncate">Loading...</div>
-          
+          <div id="navUserEmail" class="text-xs text-[var(--text-dim)] truncate"></div>
         </div>
       </div>
     </div>
@@ -345,7 +356,7 @@
   </nav>
 
   <!-- ── MAIN CONTENT ─────────────────────────── -->
-  <main class="flex-1 overflow-y-auto p-6 relative z-10">
+  <main class="flex-1 overflow-y-auto p-6 pt-24 md:pt-6 relative z-10">
     <div class="max-w-5xl mx-auto space-y-6">
 
       <!-- Page header -->
@@ -429,6 +440,27 @@
             </div>
           </div>
 
+          <!-- Bulk Send Processing -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Bulk Queue</span>
+              <button id="bulkToggleBtn" onclick="toggleBulk()" class="btn-ghost">Enable</button>
+            </div>
+            <div id="bulkBody" class="p-4" style="display:none;">
+              <div class="grid grid-cols-[1fr_1fr_auto] gap-2 mb-4">
+                <input type="email" id="bulkEmailInput" placeholder="Email (req)" style="padding:7px 10px;"/>
+                <input type="text" id="bulkNameInput" placeholder="Name (opt)" style="padding:7px 10px;"/>
+                <button onclick="addBulkTarget()" class="btn-cyan px-3" style="padding:7px 12px;">Add</button>
+              </div>
+              <div class="flex justify-between items-center mb-2">
+                <span class="mono text-xs text-[var(--text-dim)]" id="bulkStats">0 targets queued</span>
+              </div>
+              <div id="bulkTargetList" class="space-y-2 max-h-48 overflow-y-auto border border-[var(--border-mid)] p-2 rounded" style="background:#060810;">
+                <!-- targets appear here -->
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- ── RIGHT COLUMN ── -->
@@ -478,13 +510,29 @@
             </div>
           </div>
 
-          <!-- Send button -->
-          <button id="sendBtn" onclick="send()" class="btn-cyan w-full py-4 text-sm tracking-widest" style="font-size:13px; letter-spacing:0.2em;">
-            <span id="sendBtnInner">
-              <span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>
-              Send Email
-            </span>
-          </button>
+          <!-- Schedule Send -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Schedule Send</span>
+              <span class="badge badge-cyan" style="font-size: 9px;">Optional</span>
+            </div>
+            <div class="p-4">
+              <input type="datetime-local" id="sendAt" style="padding:9px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color-scheme: dark;"/>
+            </div>
+          </div>
+
+          <!-- Send & Preview buttons -->
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button onclick="previewEmail()" class="btn-ghost w-full sm:w-1/3 py-4" style="font-size:12px;">
+              <span class="material-symbols-outlined align-middle mr-1" style="font-size:16px;">visibility</span> Preview
+            </button>
+            <button id="dispatchBtn" onclick="smartDispatch()" class="btn-cyan w-full sm:w-2/3 py-4 text-sm tracking-widest" style="font-size:13px; letter-spacing:0.2em;">
+              <span id="dispatchBtnInner">
+                <span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>
+                Send Email
+              </span>
+            </button>
+          </div>
 
         </div>
       </div>
@@ -502,10 +550,43 @@
     </div>
   </div>
 
+  <!-- ── EMAIL PREVIEW MODAL ─────────────────────── -->
+  <div id="previewModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border-mid);border-radius:4px;width:90%;max-width:600px;display:flex;flex-direction:column;">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Preview</span>
+        <button onclick="closePreviewModal()" class="btn-ghost">✕ Close</button>
+      </div>
+      <div class="p-6">
+        <div class="mb-4">
+          <div class="mono text-[10px] text-[var(--text-dim)] mb-1 uppercase tracking-widest">Subject:</div>
+          <div id="previewSubject" class="text-white font-semibold"></div>
+        </div>
+        <div>
+          <div class="mono text-[10px] text-[var(--text-dim)] mb-1 uppercase tracking-widest">Body:</div>
+          <div id="previewBody" class="text-[#c9d1d9] whitespace-pre-wrap mono text-sm" style="background:#0a0e16; padding:12px; border:1px solid var(--border-mid); border-radius:3px; max-height: 400px; overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast"></div>
 
 <script>
+  function previewEmail() {
+    const targetName = document.getElementById('targetName').value.trim() || '[Target Name]';
+    const company = document.getElementById('company').value.trim() || '[Company]';
+    const role = document.getElementById('role').value.trim() || '[Role]';
+    let subject = document.getElementById('emailSubject').value.replace(/{target_name}/g, targetName).replace(/{company}/g, company).replace(/{role}/g, role).replace(/{user_name}/g, currentUserName);
+    let body = document.getElementById('templateBody').value.replace(/{target_name}/g, targetName).replace(/{company}/g, company).replace(/{role}/g, role).replace(/{user_name}/g, currentUserName);
+    document.getElementById('previewSubject').textContent = subject;
+    document.getElementById('previewBody').textContent = body;
+    document.getElementById('previewModal').style.display = 'flex';
+  }
+  function closePreviewModal() {
+    document.getElementById('previewModal').style.display = 'none';
+  }
   const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -568,33 +649,29 @@ Thanks for your time,
 
   // ── Boot ─────────────────────────────────────────────────────
   (async () => {
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { window.location.replace('auth.html'); return; }
-      currentUserId = session.user.id;
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.replace('auth.html'); return; }
+    currentUserId = session.user.id;
 
-      // Load profile
-      const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
-      if (profile) {
-        currentUserName = profile.full_name || session.user.email.split('@')[0];
-        document.getElementById('navUserName').textContent = currentUserName;
-        document.getElementById('navUserEmail').textContent = session.user.email;
-        renderNavAvatar(profile.avatar_url, currentUserName);
-      } else {
-        currentUserName = session.user.email.split('@')[0];
-        document.getElementById('navUserName').textContent = currentUserName;
-        document.getElementById('navUserEmail').textContent = session.user.email;
-        renderNavAvatar(null, currentUserName);
-      }
-
-      // Load SMTP accounts
-      await loadSmtpAccounts();
-    } catch (e) {
-      console.error('Supabase boot failed:', e);
-      showToast('Could not load user data. Refresh and try again.', 'error');
-    } finally {
-      switchTemplate('Industry');
+    // Load profile
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
+    if (profile) {
+      currentUserName = profile.full_name || session.user.email.split('@')[0];
+      document.getElementById('navUserName').textContent = currentUserName;
+      document.getElementById('navUserEmail').textContent = session.user.email;
+      renderNavAvatar(profile.avatar_url, currentUserName);
+    } else {
+      currentUserName = session.user.email.split('@')[0];
+      document.getElementById('navUserName').textContent = currentUserName;
+      document.getElementById('navUserEmail').textContent = session.user.email;
+      renderNavAvatar(null, currentUserName);
     }
+
+    // Load SMTP accounts
+    await loadSmtpAccounts();
+
+    // Set default template
+    switchTemplate('Industry');
   })();
 
   function renderNavAvatar(url, name) {
@@ -614,11 +691,7 @@ Thanks for your time,
 
   // ── SMTP accounts ─────────────────────────────────────────────
   async function loadSmtpAccounts() {
-    if (!currentUserId) {
-      document.getElementById('smtpAccountId').innerHTML = '<option value="">— User session required to load SMTP configurations. —</option>';
-      return;
-    }
-    const { data, error } = await sb.from('smtp_configs').select('*').eq('user_id', currentUserId).order('created_at');
+    const { data, error } = await sb.from('smtp_configs').select('*').order('created_at');
     if (error || !data || data.length === 0) {
       document.getElementById('smtpAccountId').innerHTML = '<option value="">— No SMTP nodes. Add one in Account Manager. —</option>';
       return;
@@ -712,17 +785,29 @@ Thanks for your time,
     await _origParseRecruiterFile();
     // If bulk mode on, offer to add parsed emails
     if (bulkMode) {
-      const raw = document.getElementById('parsedRecruiterEmails').value;
-      if (!raw) return;
-      const lines = raw.split('\n').filter(Boolean);
-      lines.forEach(line => {
-        const email = line.trim();
-        if (email && !bulkTargets.find(t => t.email === email)) {
-          bulkTargets.push({ email, name: '', company: '', role: '' });
-        }
-      });
+      const pairs = window._lastParsedPairs || [];
+      let added = 0;
+      if (pairs.length > 0) {
+        pairs.forEach(p => {
+          if (p.email && !bulkTargets.find(t => t.email === p.email)) {
+            bulkTargets.push({ email: p.email, name: p.name || '', company: '', role: '' });
+            added++;
+          }
+        });
+      } else {
+        const raw = document.getElementById('parsedRecruiterEmails').value;
+        if (!raw) return;
+        const lines = raw.split('\n').filter(Boolean);
+        lines.forEach(line => {
+          const email = line.trim();
+          if (email && !bulkTargets.find(t => t.email === email)) {
+            bulkTargets.push({ email, name: '', company: '', role: '' });
+            added++;
+          }
+        });
+      }
       renderBulkList();
-      showToast('Added ' + lines.length + ' targets to bulk queue.', 'success');
+      if (added > 0) showToast('Added ' + added + ' targets to bulk queue.', 'success');
     }
   };
 
@@ -731,7 +816,7 @@ Thanks for your time,
     if (bulkMode) {
       await bulkDispatch();
     } else {
-      await dispatch();
+      await send();
     }
   }
 
@@ -806,16 +891,21 @@ Thanks for your time,
   async function parseRecruiterFile() {
     const input = document.getElementById('recruiterFile');
     if (!input.files.length) { showToast('Select a file first.', 'error'); return; }
+
     const fd = new FormData();
     fd.append('file', input.files[0]);
     try {
       const res = await fetch(`${API_BASE_URL}/api/recruiters/parse-file`, { method:'POST', body:fd });
       const d = await res.json();
       if (d.status !== 'success') { showToast(d.message, 'error'); return; }
+      
+      window._lastParsedPairs = d.pairs || [];
       document.getElementById('parsedRecruiterEmails').value = d.emails.join('\n');
-      showToast(`${d.count} email(s) extracted.`, 'success');
-      if (d.emails.length && !document.getElementById('targetEmail').value) {
-        document.getElementById('targetEmail').value = d.emails[0];
+      showToast(`${d.count} target(s) extracted.`, 'success');
+      
+      if (d.pairs && d.pairs.length > 0 && !document.getElementById('targetEmail').value) {
+        document.getElementById('targetEmail').value = d.pairs[0].email;
+        if (d.pairs[0].name) document.getElementById('targetName').value = d.pairs[0].name;
       }
     } catch(e) { showToast('Parser error.', 'error'); }
   }
@@ -872,9 +962,9 @@ Thanks for your time,
     if (!targetEmail) { showToast('Target email is required.', 'error'); return; }
     if (!smtpId) { showToast('Select an SMTP sender node.', 'error'); return; }
 
-    const btn = document.getElementById('sendBtn');
+    const btn = document.getElementById('dispatchBtn');
     btn.disabled = true;
-    document.getElementById('sendBtnInner').innerHTML = `<span class="spinner"></span> Sending...`;
+    document.getElementById('dispatchBtnInner').innerHTML = `<span class="spinner"></span> Sending...`;
 
     const fd = new FormData();
     fd.append('user_id', currentUserId);
@@ -908,7 +998,7 @@ Thanks for your time,
       showToast('Cannot reach backend engine.', 'error');
     } finally {
       btn.disabled = false;
-      document.getElementById('sendBtnInner').innerHTML = `<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>Send Email`;
+      document.getElementById('dispatchBtnInner').innerHTML = `<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>Send Email`;
     }
   }
 
