@@ -26,11 +26,24 @@ def encrypt_password(password):
 def decrypt_password(encrypted_password):
     return cipher_suite.decrypt(encrypted_password.encode()).decode()
 
-# --- HARDCODED TEMPLATES (NO AI) ---
-TEMPLATES = {
-    "Industry": "Hi {target_name},\n\nI am writing to express my interest in the {role} position at {company}.\n\nI bring a strong engineering background focused on optimizing systems and data structures. I have attached my resume for your review.\n\nBest,\n{user_name}",
-    "Research": "Dear Prof. {target_name},\n\nI am highly interested in the research emerging from {company}.\n\nYour recent work aligns with my focus on algorithmic efficiency. I am inquiring about summer research openings and have attached my CV.\n\nSincerely,\n{user_name}",
-    "Custom": "Hi {target_name},\n\n{custom_text}\n\nBest,\n{user_name}"
+# --- FALLBACK TEMPLATES (used if frontend sends no custom body) ---
+FALLBACK_TEMPLATES = {
+    "Industry": (
+        "Application for {role} — {user_name}",
+        "Hi {target_name},\n\nI am writing to express my interest in the {role} position at {company}.\n\n"
+        "I bring a strong engineering background focused on optimizing systems and data structures. "
+        "I have attached my resume for your review.\n\nBest,\n{user_name}"
+    ),
+    "Research": (
+        "Research Inquiry — {user_name}",
+        "Dear Prof. {target_name},\n\nI am highly interested in the research emerging from {company}.\n\n"
+        "Your recent work aligns with my focus on algorithmic efficiency. I am inquiring about summer research "
+        "openings and have attached my CV.\n\nSincerely,\n{user_name}"
+    ),
+    "Custom": (
+        "Hello from {user_name}",
+        "Hi {target_name},\n\n{custom_text}\n\nBest,\n{user_name}"
+    )
 }
 
 ALLOWED_LOCAL_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._%+-")
@@ -53,16 +66,13 @@ def is_valid_email_candidate(candidate):
 def extract_emails(text):
     if not text:
         return []
-
     separators = " \n\r\t,;<>\"'()[]{}"
     normalized_text = text
     for sep in separators:
         normalized_text = normalized_text.replace(sep, ' ')
-
     candidates = normalized_text.split()
     emails = []
     seen = set()
-
     for token in candidates:
         candidate = token.strip().strip(".:!?,")
         if is_valid_email_candidate(candidate):
@@ -70,8 +80,8 @@ def extract_emails(text):
             if lowered not in seen:
                 seen.add(lowered)
                 emails.append(lowered)
-
     return sorted(emails)
+
 
 # --- ROUTES ---
 
@@ -81,25 +91,23 @@ def parse_text():
     raw_text = request.json.get('text', '')
     emails = extract_emails(raw_text)
     email = emails[0] if emails else None
-    
+
     if not email:
         return jsonify({"error": "No valid email found."}), 400
-        
-    if '@' not in email:
-        return jsonify({"error": "Parsed email format is invalid."}), 400
 
     domain_part = email.split('@')[1]
     company_name = domain_part.split('.')[0].capitalize()
-    
+
     name_part = email.split('@')[0]
     guessed_name = name_part.replace('.', ' ').replace('_', ' ').title()
-    
+
     return jsonify({
         "target_email": email,
         "target_name": guessed_name,
         "company_or_institute": company_name,
         "role": ""
     })
+
 
 @app.route('/api/recruiters/parse-file', methods=['POST'])
 def parse_recruiters_file():
@@ -141,11 +149,8 @@ def parse_recruiters_file():
     if not emails:
         return jsonify({"status": "error", "message": "No recruiter emails found in file."}), 400
 
-    return jsonify({
-        "status": "success",
-        "emails": emails,
-        "count": len(emails)
-    })
+    return jsonify({"status": "success", "emails": emails, "count": len(emails)})
+
 
 @app.route('/api/smtp/add', methods=['POST'])
 def add_smtp():
@@ -170,63 +175,95 @@ def add_smtp():
         return jsonify({"status": "success", "message": "Account linked!"})
     except Exception:
         app.logger.exception("SMTP account linking failed")
-        return jsonify({"status": "error", "message": "SMTP authentication failed. Verify email/app password and try again."}), 401
+        return jsonify({"status": "error", "message": "SMTP authentication failed. Verify email and app password."}), 401
+
 
 @app.route('/api/campaign/send', methods=['POST'])
 def send_email():
-    """Constructs and dispatches the email with PDF in memory"""
+    """
+    Dispatches the email.
+    Accepts custom_subject and custom_body from the frontend (editable templates).
+    Falls back to hardcoded templates if not provided.
+    """
     user_id = request.form.get('user_id')
     account_id = request.form.get('smtp_config_id')
-    template_type = request.form.get('template_type')
+    template_type = request.form.get('template_type', 'Industry')
     pdf_file = request.files.get('resume')
-    
+
     target_data = {
-        "target_name": request.form.get('target_name'),
-        "role": request.form.get('role'),
-        "company": request.form.get('company'),
-        "user_name": request.form.get('user_name'),
+        "target_name": request.form.get('target_name', ''),
+        "role": request.form.get('role', ''),
+        "company": request.form.get('company', ''),
+        "user_name": request.form.get('user_name', 'The Sender'),
         "custom_text": request.form.get('custom_text', '')
     }
     target_email = request.form.get('target_email')
 
+    # Custom subject/body from frontend (editable templates)
+    custom_subject = request.form.get('custom_subject', '').strip()
+    custom_body = request.form.get('custom_body', '').strip()
+
     try:
-        # 1. Fetch Credentials & Check Limit
+        # 1. Fetch credentials & check daily limit
         account = supabase.table('smtp_configs').select('*').eq('id', account_id).execute().data[0]
         if account['daily_sent_count'] >= 50:
             return jsonify({"status": "limit_reached", "message": "Daily limit hit. Switch accounts."}), 403
 
-        # 2. Construct Email
+        # 2. Resolve subject and body
+        if custom_subject and custom_body:
+            # Use the editable template from the frontend
+            subject = custom_subject.format(**target_data)
+            body = custom_body.format(**target_data)
+        else:
+            # Fallback to Python-side hardcoded template
+            fallback_subject, fallback_body = FALLBACK_TEMPLATES.get(
+                template_type, FALLBACK_TEMPLATES["Custom"]
+            )
+            subject = fallback_subject.format(**target_data)
+            body = fallback_body.format(**target_data)
+
+        # 3. Construct email
         msg = EmailMessage()
-        msg['Subject'] = f"Application for {target_data['role']} - {target_data['user_name']}"
+        msg['Subject'] = subject
         msg['From'] = account['email_address']
         msg['To'] = target_email
-        msg.set_content(TEMPLATES[template_type].format(**target_data))
+        msg.set_content(body)
 
         if pdf_file:
-            msg.add_attachment(pdf_file.read(), maintype='application', subtype='pdf', filename=pdf_file.filename)
+            msg.add_attachment(
+                pdf_file.read(),
+                maintype='application',
+                subtype='pdf',
+                filename=pdf_file.filename
+            )
 
-        # 3. Send via SMTP
+        # 4. Send via SMTP
         server = smtplib.SMTP_SSL(account['smtp_host'], account['smtp_port'])
         server.login(account['email_address'], decrypt_password(account['encrypted_app_password']))
         server.send_message(msg)
         server.quit()
 
-        # 4. Log Success
-        supabase.table('smtp_configs').update({"daily_sent_count": account['daily_sent_count'] + 1}).eq('id', account_id).execute()
+        # 5. Log success
+        supabase.table('smtp_configs').update(
+            {"daily_sent_count": account['daily_sent_count'] + 1}
+        ).eq('id', account_id).execute()
+
         supabase.table('applications').insert({
             "user_id": user_id,
             "target_email": target_email,
+            "target_name": target_data['target_name'],
             "company_or_institute": target_data['company'],
+            "role": target_data['role'],
             "template_used": template_type,
             "status": "Sent"
         }).execute()
 
         return jsonify({"status": "success", "message": "Email dispatched!"})
-    
+
     except Exception:
         app.logger.exception("Email dispatch failed")
-        return jsonify({"status": "error", "message": "Dispatch failed due to server or SMTP error."}), 500
+        return jsonify({"status": "error", "message": "Dispatch failed due to a server or SMTP error."}), 500
+
 
 if __name__ == '__main__':
-    # Runs on port 5000 in Codespaces
     app.run(host='0.0.0.0', port=5000, debug=True)
