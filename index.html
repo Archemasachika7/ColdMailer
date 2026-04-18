@@ -565,7 +565,6 @@ Thanks for your time,
   let resumeFile = null;
   let resumeObjectUrl = null;
   let smtpAccounts = [];
-  switchTemplate('Industry');
 
   // ── Boot ─────────────────────────────────────────────────────
   (async () => {
@@ -591,7 +590,10 @@ Thanks for your time,
       // Load SMTP accounts
       await loadSmtpAccounts();
     } catch (e) {
-      showToast('Could not load user data from Supabase.', 'error');
+      console.error('Supabase boot failed:', e);
+      showToast('Could not load user data. Refresh and try again.', 'error');
+    } finally {
+      switchTemplate('Industry');
     }
   })();
 
@@ -612,9 +614,11 @@ Thanks for your time,
 
   // ── SMTP accounts ─────────────────────────────────────────────
   async function loadSmtpAccounts() {
-    let query = sb.from('smtp_configs').select('*').order('created_at');
-    if (currentUserId) query = query.eq('user_id', currentUserId);
-    const { data, error } = await query;
+    if (!currentUserId) {
+      document.getElementById('smtpAccountId').innerHTML = '<option value="">— User session required to load SMTP configurations. —</option>';
+      return;
+    }
+    const { data, error } = await sb.from('smtp_configs').select('*').eq('user_id', currentUserId).order('created_at');
     if (error || !data || data.length === 0) {
       document.getElementById('smtpAccountId').innerHTML = '<option value="">— No SMTP nodes. Add one in Account Manager. —</option>';
       return;
