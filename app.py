@@ -6,7 +6,7 @@ from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
-from cryptography.fernet import Fernet
+# from cryptography.fernet import Fernet  # disabled for debug
 from dotenv import load_dotenv
 from docx import Document
 
@@ -17,14 +17,14 @@ CORS(app)
 
 # Initialize Supabase and Encryption
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-cipher_suite = Fernet(os.getenv("FERNET_KEY").encode())
+# cipher_suite disabled for debug
 
 # --- HELPER FUNCTIONS ---
-def encrypt_password(password):
-    return cipher_suite.encrypt(password.encode()).decode()
+def encrypt_password(password):  # NO-OP: plaintext
+    return password  # stored as plaintext
 
-def decrypt_password(encrypted_password):
-    return cipher_suite.decrypt(encrypted_password.encode()).decode()
+def decrypt_password(encrypted_password):  # NO-OP: plaintext
+    return encrypted_password  # returned as-is
 
 # --- FALLBACK TEMPLATES (used if frontend sends no custom body) ---
 FALLBACK_TEMPLATES = {
@@ -154,28 +154,24 @@ def parse_recruiters_file():
 
 @app.route('/api/smtp/add', methods=['POST'])
 def add_smtp():
-    """Tests and securely saves SMTP credentials"""
+    """Saves SMTP credentials — NO live auth test, plaintext storage for debug"""
     data = request.json
     email = data.get('email')
     app_password = data.get('app_password')
     user_id = data.get('user_id')
 
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(email, app_password)
-        server.quit()
-
-        secure_password = encrypt_password(app_password)
+        # NOTE: SMTP live-test removed for debugging. Saves directly.
         supabase.table('smtp_configs').insert({
             "user_id": user_id,
             "email_address": email,
-            "encrypted_app_password": secure_password
+            "encrypted_app_password": app_password  # plaintext for now
         }).execute()
 
-        return jsonify({"status": "success", "message": "Account linked!"})
+        return jsonify({"status": "success", "message": "Account saved!"})
     except Exception:
-        app.logger.exception("SMTP account linking failed")
-        return jsonify({"status": "error", "message": "SMTP authentication failed. Verify email and app password."}), 401
+        app.logger.exception("SMTP save failed")
+        return jsonify({"status": "error", "message": "Database save failed. Check Supabase connection."}), 500
 
 
 @app.route('/api/campaign/send', methods=['POST'])
