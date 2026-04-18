@@ -1,225 +1,550 @@
 <!DOCTYPE html>
-<html class="dark" lang="en">
+<html lang="en">
 <head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Account Manager - The Void</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SMTP Nodes — The Architect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --cyan: #00f2ff;
+      --cyan-dim: rgba(0,242,255,0.08);
+      --bg: #080b10;
+      --surface: #0d1117;
+      --surface2: #111720;
+      --border: rgba(0,242,255,0.1);
+      --border-mid: rgba(0,242,255,0.22);
+      --text: #c9d1d9;
+      --text-dim: #58a6a6;
+      --red: #ff4d6d;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Manrope', sans-serif; background: var(--bg); color: var(--text); }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+    .syne { font-family: 'Syne', sans-serif; }
 
-        async function enforceSecurity() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) {
-                window.location.replace('auth.html'); 
-            } else {
-                window.CURRENT_USER_ID = session.user.id;
-                loadAccounts(); // Fetch real data once authenticated
-            }
-        }
-        enforceSecurity();
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,242,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,242,255,0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none; z-index: 0;
+    }
 
-        async function logout() {
-            await supabaseClient.auth.signOut();
-            window.location.replace('auth.html');
-        }
-    </script>
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,242,255,0.15); border-radius: 2px; }
 
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary-container": "#00f2ff",
-                        "background": "#10131a",
-                        "surface-variant": "#32353c",
-                        "outline-variant": "#3a494b",
-                        "error": "#ffb4ab",
-                    },
-                    fontFamily: {
-                        "headline": ["Space Grotesk", "sans-serif"],
-                        "body": ["Manrope", "sans-serif"]
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { font-family: 'Manrope', sans-serif; }
-        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Space Grotesk', sans-serif; }
-    </style>
+    nav { background: #060810; border-right: 1px solid var(--border); }
+    .nav-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 4px;
+      font-size: 13px; font-weight: 500;
+      color: var(--text-dim); text-decoration: none;
+      transition: all 0.15s; position: relative;
+    }
+    .nav-link:hover { background: rgba(0,242,255,0.05); color: var(--text); }
+    .nav-link.active { color: var(--cyan); background: rgba(0,242,255,0.07); }
+    .nav-link.active::after {
+      content: ''; position: absolute; right: 0; top: 20%; bottom: 20%;
+      width: 2px; background: var(--cyan); border-radius: 2px;
+      box-shadow: 0 0 8px var(--cyan);
+    }
+    .nav-avatar { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--border-mid); object-fit: cover; background: #0d1a1a; }
+    .nav-avatar-placeholder {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1.5px solid var(--border-mid); background: #0d1a1a;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--cyan);
+    }
+
+    /* Node cards */
+    .node-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      animation: cardIn 0.3s ease forwards;
+      opacity: 0; transform: translateY(8px);
+    }
+    .node-card:hover { border-color: var(--border-mid); box-shadow: 0 0 24px rgba(0,242,255,0.04); }
+    @keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
+    .node-card::before {
+      content: ''; position: absolute; top: 0; left: 0;
+      width: 2px; height: 100%; background: var(--cyan);
+      box-shadow: 0 0 12px rgba(0,242,255,0.4);
+    }
+
+    /* Add node card */
+    .add-card {
+      background: transparent;
+      border: 1px dashed var(--border-mid);
+      border-radius: 4px; padding: 20px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 180px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .add-card:hover { border-color: var(--cyan); background: var(--cyan-dim); }
+    .add-icon {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 1px solid var(--border-mid);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-dim); margin-bottom: 10px;
+      transition: all 0.2s;
+    }
+    .add-card:hover .add-icon { border-color: var(--cyan); color: var(--cyan); transform: scale(1.1); }
+
+    /* Progress bar */
+    .prog-track { background: #0a0e16; border-radius: 2px; height: 3px; }
+    .prog-fill {
+      height: 3px; border-radius: 2px;
+      background: var(--cyan);
+      box-shadow: 0 0 6px rgba(0,242,255,0.5);
+      transition: width 0.6s ease;
+    }
+    .prog-fill.warn { background: #ffb347; box-shadow: 0 0 6px rgba(255,179,71,0.5); }
+    .prog-fill.danger { background: var(--red); box-shadow: 0 0 6px rgba(255,77,109,0.5); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border-mid);
+      border-radius: 4px;
+      width: 100%; max-width: 440px;
+      margin: 20px;
+      position: relative;
+      animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform: scale(0.96); } to { opacity:1; transform: scale(1); } }
+    .modal-top { height: 2px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); border-radius: 4px 4px 0 0; }
+    .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); }
+    .modal-body { padding: 20px 24px 24px; }
+
+    /* Form inputs */
+    .field-label {
+      display: block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 6px;
+    }
+    input[type="email"], input[type="password"], input[type="text"] {
+      width: 100%;
+      background: #0a0e16 !important;
+      border: 1px solid var(--border-mid) !important;
+      border-radius: 3px;
+      padding: 10px 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      color: var(--text) !important;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    input:focus { border-color: rgba(0,242,255,0.5) !important; box-shadow: 0 0 0 3px rgba(0,242,255,0.07) !important; }
+    input::placeholder { color: rgba(88,166,166,0.35) !important; opacity: 1 !important; }
+    input:-webkit-autofill, input:-webkit-autofill:focus {
+      -webkit-box-shadow: 0 0 0 1000px #0a0e16 inset !important;
+      -webkit-text-fill-color: var(--text) !important;
+    }
+
+    .btn-cyan {
+      background: var(--cyan); color: #030912;
+      font-weight: 700; font-size: 12px; letter-spacing: 0.1em;
+      padding: 10px 20px; border: none; border-radius: 3px;
+      cursor: pointer; transition: all 0.15s;
+      font-family: 'IBM Plex Mono', monospace; text-transform: uppercase;
+    }
+    .btn-cyan:hover { box-shadow: 0 0 20px rgba(0,242,255,0.35); }
+    .btn-cyan:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent; border: 1px solid var(--border-mid);
+      color: var(--text-dim); font-size: 11px; font-weight: 600;
+      font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 8px 16px; border-radius: 3px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-ghost:hover { border-color: var(--cyan); color: var(--cyan); }
+    .btn-danger {
+      background: transparent; border: 1px solid rgba(255,77,109,0.3);
+      color: var(--red); font-size: 11px; font-weight: 600;
+      font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 6px 12px; border-radius: 3px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-danger:hover { border-color: var(--red); background: rgba(255,77,109,0.08); }
+
+    .spinner {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(0,242,255,0.2); border-top-color: var(--cyan);
+      border-radius: 50%; animation: spin 0.65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    #toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 12px 20px; border-radius: 4px;
+      font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text);
+      transform: translateY(20px); opacity: 0; transition: all 0.25s;
+      pointer-events: none; max-width: 320px; z-index: 9999;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-left: 3px solid var(--cyan); }
+    #toast.error { border-left: 3px solid var(--red); color: var(--red); }
+
+    /* Status dot */
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .status-ok { background: #00f2a0; box-shadow: 0 0 6px #00f2a0; animation: pulse 2s infinite; }
+    .status-warn { background: #ffb347; box-shadow: 0 0 6px #ffb347; animation: pulse 2s infinite; }
+    .status-dead { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  </style>
 </head>
-<body class="bg-[#10131a] text-[#e1e2eb] flex h-screen overflow-hidden">
+<body class="flex h-screen overflow-hidden relative">
 
-    <nav class="hidden md:flex flex-col h-full py-8 border-r border-[#3a494b]/20 bg-[#0b0e14] text-[#00f2ff] font-['Manrope'] text-sm font-medium w-64 shrink-0 z-40 relative">
-        <div class="px-6 mb-8 flex items-center gap-4">
-            <div>
-                <h1 class="font-['Space_Grotesk'] font-black text-[#e1e2eb] tracking-tight">The Architect</h1>
-                <p class="text-[#b9cacb] text-xs">Cold Email SaaS</p>
-            </div>
-        </div>
-        <div class="flex-1 overflow-y-auto space-y-1 px-3">
-            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#b9cacb] hover:bg-[#191c22] hover:text-[#e1e2eb] transition-colors" href="index.html">
-                <span class="material-symbols-outlined">send</span> Dispatch
-            </a>
-            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#00f2ff] bg-[#191c22] border-r-4 border-[#00f2ff]" href="account-manager.html">
-                <span class="material-symbols-outlined">manage_accounts</span> Account Manager
-            </a>
-        </div>
-        <div class="px-3 mt-auto pt-6 border-t border-[#3a494b]/20">
-            <button onclick="logout()" class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-[#ffb4ab] hover:bg-[#191c22] transition-colors text-left">
-                <span class="material-symbols-outlined">logout</span> Terminate Session
-            </button>
-        </div>
-    </nav>
-
-    <main class="flex-1 relative overflow-y-auto bg-[#10131a] p-8">
-        <div class="max-w-6xl mx-auto relative z-10">
-            <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 border-b border-[#3a494b]/20 pb-6">
-                <div>
-                    <h2 class="font-headline text-3xl font-bold text-white tracking-tight mb-2">SMTP Node Manager</h2>
-                    <p class="text-[#b9cacb] text-sm">Monitor rotation limits and configure dispatch engines.</p>
-                </div>
-            </div>
-
-            <div id="accountsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                <div id="addNodeBtn" class="rounded-xl border-2 border-dashed border-[#3a494b]/50 hover:border-[#00f2ff]/50 bg-[#191c22]/30 p-6 flex flex-col items-center justify-center min-h-[200px] cursor-pointer transition-all hover:bg-[#191c22]/60 group" onclick="openModal()">
-                    <div class="w-14 h-14 rounded-full bg-[#272a31] flex items-center justify-center text-[#b9cacb] group-hover:text-[#00f2ff] group-hover:scale-110 transition-all duration-300 mb-3">
-                        <span class="material-symbols-outlined text-3xl">add</span>
-                    </div>
-                    <h3 class="font-bold text-[#e1e2eb] group-hover:text-white">Deploy New Node</h3>
-                    <p class="text-xs text-[#b9cacb] mt-1 text-center">Add a new Gmail App Password</p>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <div id="addNodeModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div class="bg-[#191c22] border border-[#3a494b] p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 class="font-headline text-xl font-bold text-white mb-2">Initialize New Node</h2>
-            <p class="text-[#b9cacb] text-xs mb-6">Enter your Gmail address and a 16-character Google App Password. Do not use your standard password.</p>
-            
-            <form id="nodeForm" class="space-y-4">
-                <div>
-                    <label class="text-[11px] font-bold uppercase tracking-wider text-[#b9cacb] block mb-1">Email Address</label>
-                    <input id="nodeEmail" type="email" required class="w-full bg-[#10131a] border border-[#3a494b]/40 rounded p-3 text-white text-sm focus:border-[#00f2ff] focus:outline-none">
-                </div>
-                <div>
-                    <label class="text-[11px] font-bold uppercase tracking-wider text-[#b9cacb] block mb-1">App Password</label>
-                    <input id="nodePassword" type="password" required class="w-full bg-[#10131a] border border-[#3a494b]/40 rounded p-3 text-white text-sm focus:border-[#00f2ff] focus:outline-none" placeholder="xxxx xxxx xxxx xxxx">
-                </div>
-                
-                <div class="pt-4 flex gap-3">
-                    <button type="button" onclick="closeModal()" class="flex-1 rounded bg-transparent border border-[#3a494b] text-[#b9cacb] py-2 font-bold hover:bg-[#32353c] transition-colors">Cancel</button>
-                    <button type="submit" id="saveNodeBtn" class="flex-1 rounded bg-[#00f2ff] text-[#006a71] py-2 font-bold hover:shadow-[0_0_15px_#00f2ff4d] transition-shadow">Save & Encrypt</button>
-                </div>
-            </form>
-        </div>
+  <!-- ── SIDEBAR ── -->
+  <nav class="hidden md:flex flex-col h-full w-60 shrink-0 py-6 z-40">
+    <div class="px-5 mb-8">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="w-2 h-2 rounded-full" style="background:var(--cyan); box-shadow:0 0 8px var(--cyan); animation:pulse 2s infinite;"></div>
+        <span class="syne font-bold text-white text-base tracking-widest uppercase">The Architect</span>
+      </div>
+      <div class="mono text-[10px] tracking-[0.15em] ml-4" style="color:var(--text-dim);">// DISPATCH SYSTEM</div>
     </div>
 
-    <script>
-        // Use empty string to route to same domain on Vercel
-        const API_BASE_URL = ''; 
+    <div class="px-4 mb-6">
+      <div class="flex items-center gap-3 px-3 py-3 rounded-md" style="background:rgba(0,242,255,0.04); border:1px solid var(--border);">
+        <div id="navAvatarWrap"></div>
+        <div class="overflow-hidden">
+          <div id="navUserName" class="text-sm font-semibold text-white truncate">—</div>
+          <div id="navUserEmail" class="mono text-[10px] truncate" style="color:var(--text-dim);"></div>
+        </div>
+      </div>
+    </div>
 
-        // 1. Fetch Real Accounts from Supabase
-        async function loadAccounts() {
-            const { data, error } = await supabaseClient
-                .from('smtp_configs')
-                .select('*')
-                .order('created_at', { ascending: true });
+    <div class="flex-1 px-3 space-y-1">
+      <a href="index.html" class="nav-link">
+        <span class="material-symbols-outlined text-[18px]">rocket_launch</span> Dispatch
+      </a>
+      <a href="account-manager.html" class="nav-link active">
+        <span class="material-symbols-outlined text-[18px]">manage_accounts</span> SMTP Nodes
+      </a>
+      <a href="history.html" class="nav-link">
+        <span class="material-symbols-outlined text-[18px]">history</span> History
+      </a>
+      <a href="profile.html" class="nav-link">
+        <span class="material-symbols-outlined text-[18px]">person</span> Profile
+      </a>
+    </div>
 
-            if (error) {
-                console.error("Error fetching accounts:", error);
-                return;
-            }
+    <div class="px-3 mt-4 pt-4" style="border-top:1px solid var(--border);">
+      <button onclick="logout()" class="nav-link w-full text-left" style="color:var(--red);">
+        <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Terminate
+      </button>
+    </div>
+  </nav>
 
-            const grid = document.getElementById('accountsGrid');
-            const addBtn = document.getElementById('addNodeBtn');
-            
-            // Clear current cards, keep the add button
-            grid.innerHTML = '';
+  <!-- ── MAIN ── -->
+  <main class="flex-1 overflow-y-auto p-6 relative z-10">
+    <div class="max-w-5xl mx-auto">
 
-            data.forEach(account => {
-                const percentage = (account.daily_sent_count / 50) * 100;
-                
-                const card = document.createElement('div');
-                card.className = "rounded-xl bg-[#32353c]/40 border border-[#3a494b]/30 p-6 shadow-xl relative overflow-hidden";
-                card.innerHTML = `
-                    <div class="absolute top-0 left-0 w-1 h-full bg-[#00f2ff]"></div>
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded bg-[#272a31] flex items-center justify-center text-[#00f2ff]">
-                                <span class="material-symbols-outlined">mail</span>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-white text-sm">${account.email_address}</h3>
-                                <p class="text-xs text-[#b9cacb]">${account.smtp_host}:${account.smtp_port}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-6">
-                        <div class="flex justify-between text-xs mb-2">
-                            <span class="text-[#b9cacb] font-medium uppercase tracking-wider">Daily Limit</span>
-                            <span class="text-[#00f2ff] font-bold">${account.daily_sent_count} / 50</span>
-                        </div>
-                        <div class="w-full bg-[#191c22] rounded-full h-2">
-                            <div class="bg-[#00f2ff] h-2 rounded-full shadow-[0_0_10px_#00f2ff80]" style="width: ${percentage}%"></div>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
+      <div class="flex items-start justify-between mb-8">
+        <div>
+          <h1 class="syne text-2xl font-bold text-white tracking-wide">SMTP Node Manager</h1>
+          <p class="mono text-[11px] mt-1 tracking-widest" style="color:var(--text-dim);">// ENCRYPTION · ROTATION · DISPATCH ENGINES</p>
+        </div>
+        <div class="text-right">
+          <div id="totalStats" class="mono text-[11px]" style="color:var(--text-dim);">Loading nodes...</div>
+        </div>
+      </div>
 
-            // Put the Add button back at the end of the grid
-            grid.appendChild(addBtn);
-        }
+      <!-- Grid -->
+      <div id="nodesGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <!-- Cards rendered by JS -->
+        <!-- Add card always at end -->
+      </div>
 
-        // 2. Modal Logic
-        function openModal() { document.getElementById('addNodeModal').classList.remove('hidden'); }
-        function closeModal() { document.getElementById('addNodeModal').classList.add('hidden'); }
+    </div>
+  </main>
 
-        // 3. Save Node to Flask Backend (for Encryption)
-        document.getElementById('nodeForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('saveNodeBtn');
-            btn.textContent = 'Encrypting...';
-            btn.disabled = true;
+  <!-- ── ADD NODE MODAL ── -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal-box">
+      <div class="modal-top"></div>
+      <div class="modal-header">
+        <h2 class="syne font-bold text-white text-lg">Initialize New Node</h2>
+        <p class="mono text-[11px] mt-1" style="color:var(--text-dim);">Gmail address + 16-char App Password. Never your main password.</p>
+      </div>
+      <div class="modal-body space-y-4">
+        <div id="modalMsg" class="mono text-[11px] p-3 rounded hidden" style="border:1px solid;"></div>
+        <div>
+          <label class="field-label">Gmail Address</label>
+          <input type="email" id="nodeEmail" placeholder="dispatch@gmail.com"/>
+        </div>
+        <div>
+          <label class="field-label">App Password</label>
+          <input type="password" id="nodePassword" placeholder="xxxx xxxx xxxx xxxx"/>
+          <p class="mono text-[10px] mt-2" style="color:var(--text-dim);">Google Account → Security → 2-Step Verification → App Passwords</p>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button class="btn-ghost flex-1" onclick="closeModal()">Cancel</button>
+          <button class="btn-cyan flex-1" id="saveNodeBtn" onclick="saveNode()">
+            <span id="saveBtnText">Save & Encrypt</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-            const payload = {
-                user_id: window.CURRENT_USER_ID,
-                email: document.getElementById('nodeEmail').value,
-                app_password: document.getElementById('nodePassword').value
-            };
+  <!-- ── DELETE CONFIRM MODAL ── -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-box">
+      <div class="modal-top" style="background:linear-gradient(90deg,transparent,var(--red),transparent);"></div>
+      <div class="modal-header">
+        <h2 class="syne font-bold text-white text-lg">Remove Node</h2>
+        <p class="mono text-[11px] mt-1" style="color:var(--text-dim);">This will permanently delete the encrypted credentials.</p>
+      </div>
+      <div class="modal-body">
+        <p class="text-sm mb-5" id="deleteConfirmText" style="color:var(--text);"></p>
+        <div class="flex gap-3">
+          <button class="btn-ghost flex-1" onclick="closeDeleteModal()">Cancel</button>
+          <button class="btn-danger flex-1" id="confirmDeleteBtn" onclick="confirmDelete()">Delete Node</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/smtp/add`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const result = await response.json();
-                if (result.status === 'success') {
-                    closeModal();
-                    document.getElementById('nodeForm').reset();
-                    loadAccounts(); // Refresh the grid
-                } else {
-                    alert("Error: " + result.message);
-                }
-            } catch (error) {
-                alert("Server error. Check backend logs.");
-            } finally {
-                btn.textContent = 'Save & Encrypt';
-                btn.disabled = false;
-            }
-        });
-    </script>
+  <div id="toast"></div>
+
+<script>
+  const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const API_BASE_URL = '';
+
+  let currentUserId = null;
+  let deleteTargetId = null;
+
+  // ── Boot ──────────────────────────────────────────────────────
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.replace('auth.html'); return; }
+    currentUserId = session.user.id;
+
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
+    const name = profile?.full_name || session.user.email.split('@')[0];
+    document.getElementById('navUserName').textContent = name;
+    document.getElementById('navUserEmail').textContent = session.user.email;
+    renderNavAvatar(profile?.avatar_url, name);
+
+    await loadAccounts();
+  })();
+
+  function renderNavAvatar(url, name) {
+    const wrap = document.getElementById('navAvatarWrap');
+    if (url) {
+      wrap.innerHTML = `<img src="${url}" class="nav-avatar" alt="${name}"/>`;
+    } else {
+      const initials = name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      wrap.innerHTML = `<div class="nav-avatar-placeholder">${initials}</div>`;
+    }
+  }
+
+  async function logout() {
+    await sb.auth.signOut();
+    window.location.replace('auth.html');
+  }
+
+  // ── Load accounts ──────────────────────────────────────────────
+  async function loadAccounts() {
+    const { data, error } = await sb.from('smtp_configs').select('*').order('created_at');
+    const grid = document.getElementById('nodesGrid');
+    grid.innerHTML = '';
+
+    if (!error && data && data.length > 0) {
+      const totalSent = data.reduce((s,a) => s + a.daily_sent_count, 0);
+      const totalCap = data.length * 50;
+      document.getElementById('totalStats').textContent =
+        `${data.length} node${data.length!==1?'s':''} · ${totalSent}/${totalCap} sent today`;
+
+      data.forEach((acct, i) => {
+        const card = buildCard(acct, i);
+        grid.appendChild(card);
+      });
+    } else {
+      document.getElementById('totalStats').textContent = '0 nodes deployed';
+    }
+
+    // Always append the add button
+    grid.appendChild(buildAddCard());
+  }
+
+  function buildCard(acct, idx) {
+    const pct = Math.min((acct.daily_sent_count / 50) * 100, 100);
+    const remaining = 50 - acct.daily_sent_count;
+    const progClass = pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : '';
+    const dotClass = pct >= 90 ? 'status-dead' : pct >= 70 ? 'status-warn' : 'status-ok';
+    const statusText = pct >= 90 ? 'Limit Reached' : pct >= 70 ? 'Near Limit' : 'Active';
+
+    const card = document.createElement('div');
+    card.className = 'node-card';
+    card.style.animationDelay = (idx * 0.05) + 's';
+    card.innerHTML = `
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div style="width:38px;height:38px;border-radius:4px;background:#0a0e16;border:1px solid var(--border-mid);display:flex;align-items:center;justify-content:center;color:var(--cyan);">
+            <span class="material-symbols-outlined" style="font-size:18px;">alternate_email</span>
+          </div>
+          <div>
+            <div class="font-semibold text-white text-sm">${escHtml(acct.email_address)}</div>
+            <div class="mono text-[10px]" style="color:var(--text-dim);">${escHtml(acct.smtp_host)}:${acct.smtp_port}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="status-dot ${dotClass}"></span>
+          <span class="mono text-[10px]" style="color:var(--text-dim);">${statusText}</span>
+        </div>
+      </div>
+
+      <div class="mt-2 mb-4">
+        <div class="flex justify-between mono text-[10px] mb-2" style="color:var(--text-dim);">
+          <span>Daily Dispatch Limit</span>
+          <span style="color:var(--cyan);">${acct.daily_sent_count} / 50</span>
+        </div>
+        <div class="prog-track">
+          <div class="prog-fill ${progClass}" style="width:${pct}%"></div>
+        </div>
+        <div class="mono text-[10px] mt-1" style="color:var(--text-dim);">${remaining} remaining today</div>
+      </div>
+
+      <div class="flex gap-2 pt-3" style="border-top:1px solid var(--border);">
+        <button class="btn-danger" onclick="openDeleteModal('${acct.id}','${escHtml(acct.email_address)}')">Remove</button>
+      </div>
+    `;
+    return card;
+  }
+
+  function buildAddCard() {
+    const div = document.createElement('div');
+    div.className = 'add-card';
+    div.onclick = openModal;
+    div.innerHTML = `
+      <div class="add-icon">
+        <span class="material-symbols-outlined" style="font-size:22px;">add</span>
+      </div>
+      <div class="font-semibold text-sm" style="color:var(--text);">Deploy New Node</div>
+      <div class="mono text-[11px] mt-1 text-center" style="color:var(--text-dim);">Add Gmail App Password</div>
+    `;
+    return div;
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Modal logic ────────────────────────────────────────────────
+  function openModal() { document.getElementById('addModal').classList.add('open'); }
+  function closeModal() {
+    document.getElementById('addModal').classList.remove('open');
+    document.getElementById('nodeEmail').value = '';
+    document.getElementById('nodePassword').value = '';
+    hideModalMsg();
+  }
+
+  function showModalMsg(text, type='error') {
+    const el = document.getElementById('modalMsg');
+    el.textContent = text;
+    el.style.color = type === 'error' ? 'var(--red)' : 'var(--cyan)';
+    el.style.borderColor = type === 'error' ? 'rgba(255,77,109,0.3)' : 'var(--border-mid)';
+    el.style.background = type === 'error' ? 'rgba(255,77,109,0.06)' : 'rgba(0,242,255,0.05)';
+    el.classList.remove('hidden');
+  }
+  function hideModalMsg() { document.getElementById('modalMsg').classList.add('hidden'); }
+
+  async function saveNode() {
+    hideModalMsg();
+    const email = document.getElementById('nodeEmail').value.trim();
+    const pwd = document.getElementById('nodePassword').value.trim();
+    if (!email || !pwd) { showModalMsg('Both fields are required.'); return; }
+
+    const btn = document.getElementById('saveNodeBtn');
+    const span = document.getElementById('saveBtnText');
+    btn.disabled = true;
+    span.innerHTML = `<span class="spinner"></span>`;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/smtp/add`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ user_id: currentUserId, email, app_password: pwd })
+      });
+      const d = await res.json();
+      if (d.status === 'success') {
+        closeModal();
+        showToast('Node deployed & encrypted.', 'success');
+        await loadAccounts();
+      } else {
+        showModalMsg(d.message || 'Authentication failed.');
+      }
+    } catch(e) {
+      showModalMsg('Backend unreachable. Is Flask running?');
+    } finally {
+      btn.disabled = false;
+      span.textContent = 'Save & Encrypt';
+    }
+  }
+
+  // ── Delete logic ───────────────────────────────────────────────
+  function openDeleteModal(id, email) {
+    deleteTargetId = id;
+    document.getElementById('deleteConfirmText').textContent = `Remove "${email}"? This cannot be undone.`;
+    document.getElementById('deleteModal').classList.add('open');
+  }
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('open');
+    deleteTargetId = null;
+  }
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
+    const btn = document.getElementById('confirmDeleteBtn');
+    btn.textContent = 'Removing...'; btn.disabled = true;
+    const { error } = await sb.from('smtp_configs').delete().eq('id', deleteTargetId);
+    btn.disabled = false; btn.textContent = 'Delete Node';
+    if (error) { showToast('Delete failed: ' + error.message, 'error'); }
+    else { closeDeleteModal(); showToast('Node removed.', 'success'); await loadAccounts(); }
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = ''; }, 3500);
+  }
+
+  // Enter key in modal
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('addModal').classList.contains('open')) saveNode();
+    if (e.key === 'Escape') { closeModal(); closeDeleteModal(); }
+  });
+</script>
 </body>
 </html>
