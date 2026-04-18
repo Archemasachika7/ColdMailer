@@ -1,11 +1,15 @@
 import os
 import smtplib
+import csv
+import io
+import re
 from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
+from docx import Document
 
 load_dotenv()
 
@@ -30,13 +34,20 @@ TEMPLATES = {
     "Custom": "Hi {target_name},\n\n{custom_text}\n\nBest,\n{user_name}"
 }
 
+EMAIL_REGEX = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+
+def extract_emails(text):
+    emails = EMAIL_REGEX.findall(text or "")
+    return sorted(set(email.rstrip('.,;:').lower() for email in emails))
+
 # --- ROUTES ---
 
 @app.route('/api/parse', methods=['POST'])
 def parse_text():
     """AI-Free Heuristic Parser (Smart Paste)"""
     raw_text = request.json.get('text', '')
-    email = next((word for word in raw_text.split() if '@' in word and '.' in word), None)
+    emails = extract_emails(raw_text)
+    email = emails[0] if emails else None
     
     if not email:
         return jsonify({"error": "No valid email found."}), 400
@@ -53,6 +64,49 @@ def parse_text():
         "target_name": guessed_name,
         "company_or_institute": company_name,
         "role": ""
+    })
+
+@app.route('/api/recruiters/parse-file', methods=['POST'])
+def parse_recruiters_file():
+    """Extract recruiter emails from uploaded CSV/TXT/DOCX files."""
+    uploaded_file = request.files.get('file')
+    if not uploaded_file:
+        return jsonify({"status": "error", "message": "No file uploaded."}), 400
+
+    filename = (uploaded_file.filename or '').lower()
+    content = ''
+
+    try:
+        if filename.endswith('.csv'):
+            decoded = uploaded_file.read().decode('utf-8', errors='ignore')
+            csv_reader = csv.reader(io.StringIO(decoded))
+            rows = [' '.join(row) for row in csv_reader]
+            content = '\n'.join(rows)
+        elif filename.endswith('.txt'):
+            content = uploaded_file.read().decode('utf-8', errors='ignore')
+        elif filename.endswith('.docx'):
+            file_bytes = io.BytesIO(uploaded_file.read())
+            doc = Document(file_bytes)
+            paragraphs = [p.text for p in doc.paragraphs if p.text]
+            table_cells = []
+            for table in doc.tables:
+                for row in table.rows:
+                    table_cells.extend(cell.text for cell in row.cells if cell.text)
+            content = '\n'.join(paragraphs + table_cells)
+        else:
+            fallback_text = uploaded_file.read().decode('utf-8', errors='ignore')
+            content = fallback_text
+    except Exception as exc:
+        return jsonify({"status": "error", "message": f"Failed to parse file: {str(exc)}"}), 400
+
+    emails = extract_emails(content)
+    if not emails:
+        return jsonify({"status": "error", "message": "No recruiter emails found in file."}), 400
+
+    return jsonify({
+        "status": "success",
+        "emails": emails,
+        "count": len(emails)
     })
 
 @app.route('/api/smtp/add', methods=['POST'])

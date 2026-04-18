@@ -12,10 +12,10 @@
     <script>
         const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         async function enforceSecurity() {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) {
                 window.location.replace('auth.html'); 
             } else {
@@ -26,7 +26,7 @@
         enforceSecurity();
 
         async function logout() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
             window.location.replace('auth.html');
         }
     </script>
@@ -130,7 +130,7 @@
 
         // 1. Fetch Real Accounts from Supabase
         async function loadAccounts() {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('smtp_configs')
                 .select('*')
                 .order('created_at', { ascending: true });

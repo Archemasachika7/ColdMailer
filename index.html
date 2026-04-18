@@ -12,10 +12,10 @@
     <script>
         const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         async function enforceSecurity() {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) {
                 window.location.replace('auth.html'); 
             } else {
@@ -25,7 +25,7 @@
         enforceSecurity();
 
         async function logout() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
             window.location.replace('auth.html');
         }
     </script>
@@ -111,6 +111,15 @@
                     <textarea id="smartPaste" class="w-full bg-[#191c22]/50 border-b border-outline-variant/40 focus:border-primary-container focus:outline-none py-3 px-2 text-on-surface text-sm min-h-[100px]" placeholder="Paste recruiter bio here..."></textarea>
                 </div>
 
+                <div class="space-y-3">
+                    <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block">Recruiter File Parser (CSV / TXT / DOCX)</label>
+                    <div class="flex gap-3 items-center">
+                        <input type="file" id="recruiterFile" accept=".csv,.txt,.docx" class="text-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-container file:text-on-primary-container hover:file:bg-[#74f5ff]">
+                        <button type="button" onclick="parseRecruiterFile()" class="text-xs bg-primary-container text-on-primary-container px-3 py-2 rounded font-bold hover:bg-[#74f5ff]">Extract Emails</button>
+                    </div>
+                    <textarea id="parsedRecruiterEmails" class="w-full bg-[#191c22]/50 border-b border-outline-variant/40 focus:border-primary-container focus:outline-none py-3 px-2 text-on-surface text-sm min-h-[80px]" placeholder="Extracted recruiter emails will appear here..."></textarea>
+                </div>
+
                 <div class="grid grid-cols-2 gap-6">
                     <div>
                         <label class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Target Name</label>
@@ -140,8 +149,7 @@
     </main>
 
     <script>
-        // Update this URL if Codespaces changes your forwarded port address
-        const API_BASE_URL = 'http://127.0.0.1:5000'; 
+        const API_BASE_URL = '';
 
         async function parseBio() {
             const text = document.getElementById('smartPaste').value;
@@ -162,6 +170,45 @@
                 }
             } catch (error) {
                 console.error("Error parsing:", error);
+            }
+        }
+
+        async function parseRecruiterFile() {
+            const fileInput = document.getElementById('recruiterFile');
+            const output = document.getElementById('parsedRecruiterEmails');
+            output.value = '';
+
+            if (!fileInput.files.length) {
+                alert("Please upload a file first.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/recruiters/parse-file`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!response.ok || data.status !== 'success') {
+                    alert(data.message || "Failed to parse recruiter file.");
+                    return;
+                }
+
+                output.value = data.emails.join('\n');
+
+                if (data.emails.length > 0 && !document.getElementById('targetEmail').value) {
+                    const firstEmail = data.emails[0];
+                    document.getElementById('targetEmail').value = firstEmail;
+                    const guessedName = firstEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    document.getElementById('targetName').value = guessedName;
+                }
+            } catch (error) {
+                alert("Failed to connect to backend parser.");
+                console.error(error);
             }
         }
 
