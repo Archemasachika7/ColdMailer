@@ -197,8 +197,23 @@
   async function logout() { await sb.auth.signOut(); window.location.replace('auth.html'); }
 
   async function loadHistory() {
+    console.log('[History] Fetching applications...');
     const { data, error } = await sb.from('applications').select('*').order('sent_at', { ascending: false });
-    if (error || !data) { renderEmpty('Failed to load history.'); return; }
+    console.log('[History] Result:', { data, error });
+    if (error) {
+      console.error('History load error:', error);
+      renderEmpty('Error: ' + (error.message || 'RLS policy blocking read. Run fix_applications_rls.sql in Supabase.'));
+      return;
+    }
+    if (!data || data.length === 0) {
+      // Genuinely empty — no emails sent yet
+      document.getElementById('statTotal').textContent = '0';
+      document.getElementById('statToday').textContent = '0';
+      document.getElementById('statCompanies').textContent = '0';
+      document.getElementById('statTemplates').textContent = '0';
+      renderEmpty('No emails dispatched yet. Send your first one from the Dispatch page.');
+      return;
+    }
     allRows = data;
     filtered = [...allRows];
 
