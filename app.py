@@ -630,7 +630,9 @@ def run_scheduled():
     Finds all pending scheduled_jobs where send_at <= now and sends them.
     Should be called periodically (e.g. every 5 minutes via cron).
     """
+    # Use UTC now for comparison — send_at is stored as UTC ISO string from frontend
     now = datetime.now(timezone.utc).isoformat()
+    app.logger.info(f"Running scheduled jobs, UTC now: {now}")
     try:
         jobs = supabase.table('scheduled_jobs').select('*') \
             .eq('status', 'pending') \
@@ -638,12 +640,13 @@ def run_scheduled():
     except Exception:
         return jsonify({"status": "error", "message": "Could not load scheduled jobs."}), 500
 
-    sent, failed = 0, 0
+    sent, failed, errors = 0, 0, []
     for job in jobs:
         try:
             account = supabase.table('smtp_configs').select('*').eq('id', job['account_id']).execute().data[0]
             if account['daily_sent_count'] >= 50:
                 supabase.table('scheduled_jobs').update({"status": "skipped_limit"}).eq('id', job['id']).execute()
+                errors.append({"job": job['id'], "email": job['target_email'], "reason": "Daily limit reached"})
                 continue
 
             target_data = {
@@ -683,12 +686,13 @@ def run_scheduled():
             supabase.table('scheduled_jobs').update({"status": "sent"}).eq('id', job['id']).execute()
             sent += 1
 
-        except Exception:
+        except Exception as e:
             app.logger.exception(f"Scheduled send failed for job {job['id']}")
             supabase.table('scheduled_jobs').update({"status": "failed"}).eq('id', job['id']).execute()
+            errors.append({"job": job['id'], "email": job.get('target_email','?'), "reason": str(e)})
             failed += 1
 
-    return jsonify({"status": "done", "sent": sent, "failed": failed})
+    return jsonify({"status": "done", "sent": sent, "failed": failed, "errors": errors})
 
 
 # ---------------------------------------------------------------------------
