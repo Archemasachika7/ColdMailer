@@ -198,7 +198,7 @@
 
   async function loadHistory() {
     console.log('[History] Fetching applications...');
-    const { data, error } = await sb.from('applications').select('*').order('sent_at', { ascending: false });
+    const { data, error } = await sb.from('applications').select('*').order('created_at', { ascending: false });
     console.log('[History] Result:', { data, error });
     if (error) {
       console.error('History load error:', error);
@@ -219,7 +219,7 @@
 
     // Stats
     const today = new Date().toISOString().slice(0,10);
-    const todaySent = allRows.filter(r => r.sent_at?.slice(0,10) === today).length;
+    const todaySent = allRows.filter(r => r.created_at?.slice(0,10) === today).length;
     const companies = new Set(allRows.map(r => r.company_or_institute).filter(Boolean)).size;
     const templates = new Set(allRows.map(r => r.template_used).filter(Boolean)).size;
     document.getElementById('statTotal').textContent = allRows.length;
@@ -256,7 +256,7 @@
 
     tbody.innerHTML = page.map(r => {
       const tmplClass = { Industry: 'badge-industry', Research: 'badge-research', Custom: 'badge-custom' }[r.template_used] || 'badge-custom';
-      const dateStr = r.sent_at ? new Date(r.sent_at).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' }) : '—';
+      const dateStr = r.sent_at ? new Date(r.created_at).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' }) : '—';
       return `
         <tr>
           <td>
