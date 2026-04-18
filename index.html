@@ -338,12 +338,12 @@
       </a>
       <a href="account-manager.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">manage_accounts</span> Email Accounts
-      </a>
       <a href="history.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">history</span> History
       </a>
       <a href="profile.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">person</span> Profile
+      </a>
       </a>
     </div>
 
@@ -461,15 +461,7 @@
               <div class="flex justify-between items-center mb-2">
                 <span class="mono text-xs text-[var(--text-dim)]" id="bulkStats">0 targets queued</span>
               </div>
-              <!-- Column header -->
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 20px;gap:6px;padding:4px 8px;" class="mono text-[9px]" id="bulkColHeader" style="color:var(--text-dim);display:none;">
-                <span style="color:var(--text-dim);">EMAIL</span>
-                <span style="color:var(--text-dim);">NAME</span>
-                <span style="color:var(--text-dim);">COMPANY</span>
-                <span style="color:var(--text-dim);">ROLE</span>
-                <span></span>
-              </div>
-              <div id="bulkTargetList" class="space-y-1 max-h-48 overflow-y-auto border border-[var(--border-mid)] p-2 rounded" style="background:#060810;">
+              <div id="bulkTargetList" class="space-y-2 max-h-48 overflow-y-auto border border-[var(--border-mid)] p-2 rounded" style="background:#060810;">
                 <!-- targets appear here -->
               </div>
             </div>
@@ -528,10 +520,16 @@
           <div class="panel">
             <div class="panel-header">
               <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Schedule Send</span>
-              <span class="badge badge-cyan" style="font-size: 9px;">Optional</span>
+              <div class="flex items-center gap-2">
+                <span class="badge badge-cyan" style="font-size: 9px;">Optional</span>
+                <button onclick="runScheduled()" id="runScheduledBtn" class="btn-ghost" style="padding:4px 10px;font-size:10px;" title="Send all pending scheduled emails now">
+                  Run pending
+                </button>
+              </div>
             </div>
             <div class="p-4">
               <input type="datetime-local" id="sendAt" style="padding:9px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color-scheme: dark;"/>
+              <div id="scheduledCount" class="mono text-[10px] mt-2" style="color:var(--text-dim); display:none;"></div>
             </div>
           </div>
 
@@ -686,6 +684,7 @@ Thanks for your time,
 
     // Set default template
     switchTemplate('Industry');
+    await loadScheduledCount();
   })();
 
   function renderNavAvatar(url, name) {
@@ -801,8 +800,6 @@ Thanks for your time,
     }
     document.getElementById('bulkStats').textContent =
       bulkTargets.length + ' target' + (bulkTargets.length !== 1 ? 's' : '') + ' queued';
-    const hdr = document.getElementById('bulkColHeader');
-    if (hdr) hdr.style.display = bulkTargets.length > 0 ? 'grid' : 'none';
     if (bulkMode) {
       document.getElementById('dispatchBtnInner').innerHTML =
         '<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">send</span>Send to All (' + bulkTargets.length + ')';
@@ -1027,11 +1024,7 @@ Thanks for your time,
       const res = await fetch(`${API_BASE_URL}/api/campaign/send`, { method:'POST', body:fd });
       const result = await res.json();
       if (result.status === 'success' || result.status === 'scheduled') {
-        if (result.status === 'scheduled') {
-          showToast('Email scheduled successfully.', 'success');
-        } else {
-          showToast(resumeFile ? 'Email sent with CV attached.' : 'Email sent.', 'success');
-        }
+        showToast(resumeFile ? 'Email sended with CV attached.' : 'Email sended (no CV attached).', 'success');
         // Refresh SMTP bar
         await loadSmtpAccounts();
       } else {
@@ -1043,6 +1036,42 @@ Thanks for your time,
       btn.disabled = false;
       document.getElementById('dispatchBtnInner').innerHTML = `<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>Send Email`;
     }
+  }
+
+
+  // ── Scheduled jobs ────────────────────────────────────────────
+  async function loadScheduledCount() {
+    const { data } = await sb.from('scheduled_jobs')
+      .select('id', { count: 'exact' })
+      .eq('user_id', currentUserId)
+      .eq('status', 'pending');
+    const count = data?.length || 0;
+    const el = document.getElementById('scheduledCount');
+    if (count > 0) {
+      el.style.display = 'block';
+      el.textContent = `${count} email${count !== 1 ? 's' : ''} scheduled and waiting to send`;
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  async function runScheduled() {
+    const btn = document.getElementById('runScheduledBtn');
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      const res = await fetch('/api/scheduled/run', { method: 'POST' });
+      const d = await res.json();
+      if (d.status === 'done') {
+        showToast(`Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''}${d.failed > 0 ? ', ' + d.failed + ' failed' : ''}.`,
+                  d.sent > 0 ? 'success' : 'error');
+        await loadSmtpAccounts();
+        await loadScheduledCount();
+      } else {
+        showToast(d.message || 'Failed to run scheduled jobs.', 'error');
+      }
+    } catch(e) { showToast('Could not reach server.', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Run pending'; }
   }
 
   // ── Toast ─────────────────────────────────────────────────────
