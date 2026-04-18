@@ -101,24 +101,69 @@
     }
     .tmpl-tab:not(.active):hover { color: var(--text); }
 
-    /* Textarea styling */
-    textarea, input[type="text"], input[type="email"], select {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      color: var(--text);
-      font-family: 'Manrope', sans-serif;
-      font-size: 13px;
-      outline: none;
+    /* ── Form element resets — force dark theme over Tailwind forms plugin ── */
+    textarea,
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    select {
+      background: #0a0e16 !important;
+      background-color: #0a0e16 !important;
+      border: 1px solid rgba(0,242,255,0.18) !important;
+      border-radius: 3px !important;
+      color: #c9d1d9 !important;
+      font-family: 'Manrope', sans-serif !important;
+      font-size: 13px !important;
+      outline: none !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
       transition: border-color 0.15s, box-shadow 0.15s;
       width: 100%;
+      box-shadow: none !important;
     }
-    textarea:focus, input:focus, select:focus {
-      border-color: rgba(0,242,255,0.4);
-      box-shadow: 0 0 0 3px rgba(0,242,255,0.06);
+    textarea:focus,
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="password"]:focus,
+    select:focus {
+      border-color: rgba(0,242,255,0.5) !important;
+      box-shadow: 0 0 0 3px rgba(0,242,255,0.07) !important;
+      outline: none !important;
+      ring: none !important;
     }
-    textarea { resize: vertical; line-height: 1.6; }
-    input::placeholder, textarea::placeholder { color: rgba(88,166,166,0.35); }
+    textarea {
+      resize: vertical;
+      line-height: 1.6;
+      color: #c9d1d9 !important;
+    }
+    input::placeholder,
+    textarea::placeholder {
+      color: rgba(88,166,166,0.4) !important;
+      opacity: 1 !important;
+    }
+    /* Select dropdown options */
+    select option {
+      background: #0a0e16 !important;
+      background-color: #0a0e16 !important;
+      color: #c9d1d9 !important;
+    }
+    /* Select arrow — custom caret in cyan */
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2300f2ff' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: right 12px center !important;
+      padding-right: 36px !important;
+    }
+    /* Kill Chrome autofill yellow background */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus,
+    textarea:-webkit-autofill,
+    select:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 1000px #0a0e16 inset !important;
+      -webkit-text-fill-color: #c9d1d9 !important;
+      caret-color: #c9d1d9 !important;
+    }
 
     /* Buttons */
     .btn-cyan {
@@ -282,6 +327,12 @@
       </a>
       <a href="account-manager.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">manage_accounts</span> SMTP Nodes
+      <a href="history.html" class="nav-link">
+        <span class="material-symbols-outlined text-[18px]">history</span> History
+      </a>
+      <a href="profile.html" class="nav-link">
+        <span class="material-symbols-outlined text-[18px]">person</span> Profile
+      </a>
       </a>
     </div>
 
@@ -400,7 +451,7 @@
                 <label class="field-label">Email Subject</label>
                 <input type="text" id="emailSubject" style="padding:9px 12px; margin-bottom:12px;" placeholder="e.g. Application for {role} at {company}"/>
                 <label class="field-label">Email Body <span style="color:var(--text-dim); font-weight:400; text-transform:none; letter-spacing:0;">(editable)</span></label>
-                <textarea id="templateBody" rows="12" style="padding:12px; font-family:'IBM Plex Mono',monospace; font-size:12px; flex:1; min-height:200px;"></textarea>
+                <textarea id="templateBody" rows="12" style="padding:12px; font-family:'IBM Plex Mono',monospace; font-size:12px; flex:1; min-height:200px; background:#0a0e16 !important; color:#c9d1d9 !important; border:1px solid rgba(0,242,255,0.2) !important;"></textarea>
               </div>
             </div>
           </div>
@@ -664,7 +715,6 @@ Thanks for your time,
     e.preventDefault(); dz.classList.remove('dragover');
     const f = e.dataTransfer.files[0];
     if (f && f.type === 'application/pdf') {
-      document.getElementById('resumePdf').files; // reference
       resumeFile = f;
       if (resumeObjectUrl) URL.revokeObjectURL(resumeObjectUrl);
       resumeObjectUrl = URL.createObjectURL(f);
@@ -712,13 +762,16 @@ Thanks for your time,
     fd.append('user_name', currentUserName);
     fd.append('custom_subject', subject);
     fd.append('custom_body', body);
-    if (resumeFile) fd.append('resume', resumeFile);
+    if (resumeFile) {
+      // Pass as a proper Blob with filename so Flask receives it as a named file
+      fd.append('resume', new File([resumeFile], resumeFile.name, { type: 'application/pdf' }));
+    }
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/campaign/send`, { method:'POST', body:fd });
       const result = await res.json();
       if (result.status === 'success') {
-        showToast('Email dispatched successfully.', 'success');
+        showToast(resumeFile ? 'Email dispatched with CV attached.' : 'Email dispatched (no CV attached).', 'success');
         // Refresh SMTP bar
         await loadSmtpAccounts();
       } else {
