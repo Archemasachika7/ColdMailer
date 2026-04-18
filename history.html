@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dispatch History — The Architect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --cyan: #00f2ff; --cyan-dim: rgba(0,242,255,0.08);
+      --bg: #080b10; --surface: #0d1117; --surface2: #111720;
+      --border: rgba(0,242,255,0.1); --border-mid: rgba(0,242,255,0.22);
+      --text: #c9d1d9; --text-dim: #58a6a6; --red: #ff4d6d;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Manrope', sans-serif; background: var(--bg); color: var(--text); }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+    .syne { font-family: 'Syne', sans-serif; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(0,242,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,255,0.02) 1px, transparent 1px);
+      background-size: 48px 48px; pointer-events: none; z-index: 0;
+    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,242,255,0.15); border-radius: 2px; }
+    nav { background: #060810; border-right: 1px solid var(--border); }
+    .nav-link {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 4px;
+      font-size: 13px; font-weight: 500; color: var(--text-dim); text-decoration: none;
+      transition: all 0.15s; position: relative; cursor: pointer; border: none; background: none; width: 100%;
+    }
+    .nav-link:hover { background: rgba(0,242,255,0.05); color: var(--text); }
+    .nav-link.active { color: var(--cyan); background: rgba(0,242,255,0.07); }
+    .nav-link.active::after { content: ''; position: absolute; right: 0; top: 20%; bottom: 20%; width: 2px; background: var(--cyan); border-radius: 2px; box-shadow: 0 0 8px var(--cyan); }
+    .nav-avatar { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--border-mid); object-fit: cover; }
+    .nav-avatar-placeholder { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--border-mid); background: #0d1a1a; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--cyan); }
+    @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:0.3;} }
+
+    /* Stats bar */
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 16px 20px; }
+    .stat-val { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--cyan); line-height: 1; }
+    .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
+
+    /* Table */
+    .tbl-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 1px solid var(--border-mid); }
+    th { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); padding: 12px 16px; text-align: left; white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(0,242,255,0.03); }
+    td { padding: 12px 16px; font-size: 13px; color: var(--text); vertical-align: middle; }
+    td.mono-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+    /* Badge */
+    .badge { display: inline-flex; align-items: center; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 2px; border: 1px solid; }
+    .badge-sent { color: var(--cyan); border-color: rgba(0,242,255,0.25); background: rgba(0,242,255,0.06); }
+    .badge-industry { color: #a78bfa; border-color: rgba(167,139,250,0.25); background: rgba(167,139,250,0.06); }
+    .badge-research { color: #34d399; border-color: rgba(52,211,153,0.25); background: rgba(52,211,153,0.06); }
+    .badge-custom { color: #fbbf24; border-color: rgba(251,191,36,0.25); background: rgba(251,191,36,0.06); }
+
+    /* Search / filter */
+    .search-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+    .search-bar input { background: none; border: none; outline: none; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; flex: 1; }
+    .search-bar input::placeholder { color: rgba(88,166,166,0.35); }
+
+    /* Empty state */
+    .empty-state { padding: 60px 20px; text-align: center; }
+    .empty-icon { font-family: 'IBM Plex Mono', monospace; font-size: 32px; color: var(--border-mid); margin-bottom: 12px; }
+
+    /* Pagination */
+    .page-btn { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 3px; border: 1px solid var(--border-mid); background: transparent; color: var(--text-dim); cursor: pointer; transition: all 0.15s; }
+    .page-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .page-btn.current { border-color: var(--cyan); color: var(--cyan); background: rgba(0,242,255,0.07); }
+  </style>
+</head>
+<body class="flex h-screen overflow-hidden relative">
+
+  <!-- ── SIDEBAR ── -->
+  <nav class="hidden md:flex flex-col h-full w-60 shrink-0 py-6 z-40">
+    <div class="px-5 mb-8">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="w-2 h-2 rounded-full" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s infinite;"></div>
+        <span class="syne font-bold text-white text-base tracking-widest uppercase">The Architect</span>
+      </div>
+      <div class="mono text-[10px] tracking-[0.15em] ml-4" style="color:var(--text-dim);">// DISPATCH SYSTEM</div>
+    </div>
+    <div class="px-4 mb-6">
+      <div class="flex items-center gap-3 px-3 py-3 rounded-md" style="background:rgba(0,242,255,0.04);border:1px solid var(--border);">
+        <div id="navAvatarWrap"></div>
+        <div class="overflow-hidden">
+          <div id="navUserName" class="text-sm font-semibold text-white truncate">—</div>
+          <div id="navUserEmail" class="mono text-[10px] truncate" style="color:var(--text-dim);"></div>
+        </div>
+      </div>
+    </div>
+    <div class="flex-1 px-3 space-y-1">
+      <a href="index.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">rocket_launch</span> Dispatch</a>
+      <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> SMTP Nodes</a>
+      <a href="history.html" class="nav-link active"><span class="material-symbols-outlined text-[18px]">history</span> History</a>
+      <a href="profile.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">person</span> Profile</a>
+    </div>
+    <div class="px-3 mt-4 pt-4" style="border-top:1px solid var(--border);">
+      <button onclick="logout()" class="nav-link" style="color:var(--red);">
+        <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Terminate
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── MAIN ── -->
+  <main class="flex-1 overflow-y-auto p-6 relative z-10">
+    <div class="max-w-6xl mx-auto space-y-5">
+
+      <div>
+        <h1 class="syne text-2xl font-bold text-white tracking-wide">Dispatch History</h1>
+        <p class="mono text-[11px] mt-1 tracking-widest" style="color:var(--text-dim);">// ALL SENT APPLICATIONS LOG</p>
+      </div>
+
+      <!-- Stats row -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="statsRow">
+        <div class="stat-card"><div class="stat-val" id="statTotal">—</div><div class="stat-label">Total Sent</div></div>
+        <div class="stat-card"><div class="stat-val" id="statToday">—</div><div class="stat-label">Sent Today</div></div>
+        <div class="stat-card"><div class="stat-val" id="statCompanies">—</div><div class="stat-label">Companies</div></div>
+        <div class="stat-card"><div class="stat-val" id="statTemplates">—</div><div class="stat-label">Templates Used</div></div>
+      </div>
+
+      <!-- Search -->
+      <div class="search-bar">
+        <span class="material-symbols-outlined text-[16px]" style="color:var(--text-dim);">search</span>
+        <input type="text" id="searchInput" placeholder="Search by company, email, or name..." oninput="filterTable()"/>
+        <span class="mono text-[10px]" style="color:var(--text-dim);" id="countLabel"></span>
+      </div>
+
+      <!-- Table -->
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Target</th>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Template</th>
+              <th>Status</th>
+              <th>Sent At</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="6"><div class="empty-state"><div class="empty-icon">[ ]</div><div class="mono text-sm" style="color:var(--text-dim);">Loading history...</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex items-center justify-between" id="pagination" style="display:none!important;">
+        <div class="mono text-[11px]" style="color:var(--text-dim);" id="pageInfo"></div>
+        <div class="flex gap-2" id="pageButtons"></div>
+      </div>
+
+    </div>
+  </main>
+
+<script>
+  const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let allRows = [];
+  let filtered = [];
+  const PER_PAGE = 20;
+  let currentPage = 1;
+
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.replace('auth.html'); return; }
+
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+    const name = profile?.full_name || session.user.email.split('@')[0];
+    document.getElementById('navUserName').textContent = name;
+    document.getElementById('navUserEmail').textContent = session.user.email;
+    renderNavAvatar(profile?.avatar_url, name);
+
+    await loadHistory();
+  })();
+
+  function renderNavAvatar(url, name) {
+    const wrap = document.getElementById('navAvatarWrap');
+    if (url) { wrap.innerHTML = `<img src="${url}" class="nav-avatar" alt="${name}"/>`; }
+    else {
+      const i = name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      wrap.innerHTML = `<div class="nav-avatar-placeholder">${i}</div>`;
+    }
+  }
+  async function logout() { await sb.auth.signOut(); window.location.replace('auth.html'); }
+
+  async function loadHistory() {
+    const { data, error } = await sb.from('applications').select('*').order('sent_at', { ascending: false });
+    if (error || !data) { renderEmpty('Failed to load history.'); return; }
+    allRows = data;
+    filtered = [...allRows];
+
+    // Stats
+    const today = new Date().toISOString().slice(0,10);
+    const todaySent = allRows.filter(r => r.sent_at?.slice(0,10) === today).length;
+    const companies = new Set(allRows.map(r => r.company_or_institute).filter(Boolean)).size;
+    const templates = new Set(allRows.map(r => r.template_used).filter(Boolean)).size;
+    document.getElementById('statTotal').textContent = allRows.length;
+    document.getElementById('statToday').textContent = todaySent;
+    document.getElementById('statCompanies').textContent = companies;
+    document.getElementById('statTemplates').textContent = templates;
+
+    renderTable();
+  }
+
+  function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    filtered = allRows.filter(r =>
+      (r.target_email||'').toLowerCase().includes(q) ||
+      (r.target_name||'').toLowerCase().includes(q) ||
+      (r.company_or_institute||'').toLowerCase().includes(q) ||
+      (r.role||'').toLowerCase().includes(q)
+    );
+    currentPage = 1;
+    renderTable();
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('historyBody');
+    document.getElementById('countLabel').textContent = `${filtered.length} record${filtered.length!==1?'s':''}`;
+
+    if (filtered.length === 0) {
+      renderEmpty('No records found.');
+      return;
+    }
+
+    const start = (currentPage - 1) * PER_PAGE;
+    const page = filtered.slice(start, start + PER_PAGE);
+
+    tbody.innerHTML = page.map(r => {
+      const tmplClass = { Industry: 'badge-industry', Research: 'badge-research', Custom: 'badge-custom' }[r.template_used] || 'badge-custom';
+      const dateStr = r.sent_at ? new Date(r.sent_at).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' }) : '—';
+      return `
+        <tr>
+          <td>
+            <div class="font-medium text-white text-sm">${escHtml(r.target_name || '—')}</div>
+            <div class="mono text-[11px]" style="color:var(--text-dim);">${escHtml(r.target_email || '')}</div>
+          </td>
+          <td class="text-sm">${escHtml(r.company_or_institute || '—')}</td>
+          <td class="mono-cell text-[12px]" style="color:var(--text-dim);">${escHtml(r.role || '—')}</td>
+          <td><span class="badge ${tmplClass}">${escHtml(r.template_used || '—')}</span></td>
+          <td><span class="badge badge-sent">✓ ${escHtml(r.status || 'Sent')}</span></td>
+          <td class="mono-cell text-[11px]" style="color:var(--text-dim); white-space:nowrap;">${dateStr}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Pagination
+    const totalPages = Math.ceil(filtered.length / PER_PAGE);
+    const pg = document.getElementById('pagination');
+    if (totalPages > 1) {
+      pg.style.display = 'flex';
+      document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+      const btns = document.getElementById('pageButtons');
+      btns.innerHTML = '';
+      for (let p = 1; p <= totalPages; p++) {
+        const b = document.createElement('button');
+        b.className = `page-btn${p === currentPage ? ' current' : ''}`;
+        b.textContent = p;
+        b.onclick = () => { currentPage = p; renderTable(); };
+        btns.appendChild(b);
+      }
+    } else {
+      pg.style.display = 'none';
+    }
+  }
+
+  function renderEmpty(msg) {
+    document.getElementById('historyBody').innerHTML = `
+      <tr><td colspan="6">
+        <div class="empty-state">
+          <div class="empty-icon">[ ]</div>
+          <div class="mono text-sm" style="color:var(--text-dim);">${msg}</div>
+        </div>
+      </td></tr>`;
+  }
+  function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
