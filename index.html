@@ -338,12 +338,12 @@
       </a>
       <a href="account-manager.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">manage_accounts</span> Email Accounts
+      </a>
       <a href="history.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">history</span> History
       </a>
       <a href="profile.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">person</span> Profile
-      </a>
       </a>
     </div>
 
@@ -406,12 +406,18 @@
           <div class="panel">
             <div class="panel-header">
               <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">File Parser</span>
-              <button onclick="parseRecruiterFile()" class="btn-ghost">Extract Emails</button>
+              <button onclick="parseAndLoadBulk()" class="btn-cyan" style="padding:6px 14px; font-size:11px;" id="parseFileBtn">
+                <span class="material-symbols-outlined align-middle mr-1" style="font-size:13px;">upload_file</span>Parse &amp; Load
+              </button>
             </div>
             <div class="p-4 space-y-3">
+              <p class="mono text-[10px] text-[var(--text-dim)]">Upload CSV/DOCX with columns: <strong style="color:var(--cyan)">name, email, company, role</strong>. Parsed rows load directly into Bulk Queue.</p>
               <input type="file" id="recruiterFile" accept=".csv,.txt,.docx"
                 class="text-sm text-[var(--text-dim)] file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-[var(--cyan)] file:text-[#030912] file:mono file:cursor-pointer"/>
-              <textarea id="parsedRecruiterEmails" rows="3" style="padding:10px 12px;" placeholder="Extracted emails appear here..."></textarea>
+              <div id="parsedFilePreview" class="hidden">
+                <div class="mono text-[10px] text-[var(--text-dim)] mb-1" id="parsedFileCount"></div>
+                <div id="parsedFileList" class="space-y-1 max-h-28 overflow-y-auto"></div>
+              </div>
             </div>
           </div>
 
@@ -455,7 +461,15 @@
               <div class="flex justify-between items-center mb-2">
                 <span class="mono text-xs text-[var(--text-dim)]" id="bulkStats">0 targets queued</span>
               </div>
-              <div id="bulkTargetList" class="space-y-2 max-h-48 overflow-y-auto border border-[var(--border-mid)] p-2 rounded" style="background:#060810;">
+              <!-- Column header -->
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 20px;gap:6px;padding:4px 8px;" class="mono text-[9px]" id="bulkColHeader" style="color:var(--text-dim);display:none;">
+                <span style="color:var(--text-dim);">EMAIL</span>
+                <span style="color:var(--text-dim);">NAME</span>
+                <span style="color:var(--text-dim);">COMPANY</span>
+                <span style="color:var(--text-dim);">ROLE</span>
+                <span></span>
+              </div>
+              <div id="bulkTargetList" class="space-y-1 max-h-48 overflow-y-auto border border-[var(--border-mid)] p-2 rounded" style="background:#060810;">
                 <!-- targets appear here -->
               </div>
             </div>
@@ -691,8 +705,16 @@ Thanks for your time,
 
   // ── SMTP accounts ─────────────────────────────────────────────
   async function loadSmtpAccounts() {
-    const { data, error } = await sb.from('smtp_configs').select('*').order('created_at');
-    if (error || !data || data.length === 0) {
+    const { data, error } = await sb.from('smtp_configs')
+      .select('*')
+      .eq('user_id', currentUserId)
+      .order('created_at');
+    if (error) {
+      document.getElementById('smtpAccountId').innerHTML = '<option value="">— Could not load accounts (check RLS policies) —</option>';
+      console.error('SMTP load error:', error);
+      return;
+    }
+    if (!data || data.length === 0) {
       document.getElementById('smtpAccountId').innerHTML = '<option value="">— No SMTP nodes. Add one in Account Manager. —</option>';
       return;
     }
@@ -765,51 +787,79 @@ Thanks for your time,
 
   function renderBulkList() {
     const list = document.getElementById('bulkTargetList');
-    list.innerHTML = bulkTargets.map((t, i) => `
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#0a0e16;border:1px solid var(--border);border-radius:3px;">
-        <span class="mono text-[12px]" style="flex:1;color:var(--text);">${t.email}</span>
-        <span class="mono text-[11px]" style="color:var(--text-dim);">${t.name || '—'}</span>
-        <button onclick="removeBulkTarget(${i})" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:14px;">×</button>
-      </div>`).join('');
+    if (bulkTargets.length === 0) {
+      list.innerHTML = '<div class="mono text-[11px] text-center" style="color:var(--text-dim);padding:12px;">No targets yet. Parse a file or add manually.</div>';
+    } else {
+      list.innerHTML = bulkTargets.map((t, i) => `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;align-items:center;gap:6px;padding:5px 8px;background:#0a0e16;border:1px solid var(--border);border-radius:3px;">
+          <span class="mono text-[11px]" style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.email}">${t.email}</span>
+          <span class="mono text-[10px]" style="color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.name||'—'}</span>
+          <span class="mono text-[10px]" style="color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.company||'—'}</span>
+          <span class="mono text-[10px]" style="color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.role||'—'}</span>
+          <button onclick="removeBulkTarget(${i})" style="color:#ff4d6d;background:none;border:none;cursor:pointer;font-size:14px;padding:0 2px;">×</button>
+        </div>`).join('');
+    }
     document.getElementById('bulkStats').textContent =
       bulkTargets.length + ' target' + (bulkTargets.length !== 1 ? 's' : '') + ' queued';
+    const hdr = document.getElementById('bulkColHeader');
+    if (hdr) hdr.style.display = bulkTargets.length > 0 ? 'grid' : 'none';
     if (bulkMode) {
       document.getElementById('dispatchBtnInner').innerHTML =
         '<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">send</span>Send to All (' + bulkTargets.length + ')';
     }
   }
 
-  // Auto-populate bulk targets when file parser runs
-  const _origParseRecruiterFile = parseRecruiterFile;
-  parseRecruiterFile = async function() {
-    await _origParseRecruiterFile();
-    // If bulk mode on, offer to add parsed emails
-    if (bulkMode) {
-      const pairs = window._lastParsedPairs || [];
-      let added = 0;
-      if (pairs.length > 0) {
-        pairs.forEach(p => {
-          if (p.email && !bulkTargets.find(t => t.email === p.email)) {
-            bulkTargets.push({ email: p.email, name: p.name || '', company: '', role: '' });
-            added++;
-          }
-        });
-      } else {
-        const raw = document.getElementById('parsedRecruiterEmails').value;
-        if (!raw) return;
-        const lines = raw.split('\n').filter(Boolean);
-        lines.forEach(line => {
-          const email = line.trim();
-          if (email && !bulkTargets.find(t => t.email === email)) {
-            bulkTargets.push({ email, name: '', company: '', role: '' });
-            added++;
-          }
-        });
+  // ── Parse file & load directly into bulk queue (one-click flow) ──────────
+  async function parseAndLoadBulk() {
+    const input = document.getElementById('recruiterFile');
+    if (!input.files.length) { showToast('Select a CSV or DOCX file first.', 'error'); return; }
+
+    const btn = document.getElementById('parseFileBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/recruiters/parse-file`, { method: 'POST', body: fd });
+      const d   = await res.json();
+
+      if (d.status !== 'success') {
+        showToast('Parse error: ' + (d.message || 'Unknown error'), 'error');
+        return;
       }
+
+      const pairs = d.pairs || [];
+      window._lastParsedPairs = pairs;
+
+      // Show preview in panel
+      document.getElementById('parsedFilePreview').classList.remove('hidden');
+      document.getElementById('parsedFileCount').textContent = `${pairs.length} record(s) parsed:`;
+      document.getElementById('parsedFileList').innerHTML = pairs.slice(0, 5).map(p =>
+        `<div class="mono text-[10px] text-[var(--text-dim)] truncate">• ${p.email}${p.name ? ' · ' + p.name : ''}${p.company ? ' · ' + p.company : ''}</div>`
+      ).join('') + (pairs.length > 5 ? `<div class="mono text-[10px] text-[var(--text-dim)]">...and ${pairs.length - 5} more</div>` : '');
+
+      // Auto-enable bulk mode
+      if (!bulkMode) toggleBulk();
+
+      // Load into bulk queue
+      let added = 0;
+      pairs.forEach(p => {
+        if (p.email && !bulkTargets.find(t => t.email === p.email)) {
+          bulkTargets.push({ email: p.email, name: p.name || '', company: p.company || '', role: p.role || '' });
+          added++;
+        }
+      });
       renderBulkList();
-      if (added > 0) showToast('Added ' + added + ' targets to bulk queue.', 'success');
+      showToast(`${added} target(s) loaded into Bulk Queue. Hit Send to All!`, 'success');
+
+    } catch(e) {
+      showToast('Could not reach backend. Is Flask running?', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-outlined align-middle mr-1" style="font-size:13px;">upload_file</span>Parse &amp; Load';
     }
-  };
+  }
 
   // ── Smart dispatch — routes to single or bulk ─────────────────
   async function smartDispatch() {
@@ -863,14 +913,14 @@ Thanks for your time,
     }
   }
 
-  // ── Smart Paste parser ────────────────────────────────────────
+  // ── Smart Paste parser (backend + client-side fallback) ──────────────
   async function parseBio() {
     const text = document.getElementById('smartPaste').value.trim();
     if (!text) { showToast('Paste some text first.', 'error'); return; }
     const btn = document.getElementById('parseBtn');
     btn.disabled = true; btn.textContent = '...';
     try {
-      const res = await fetch(`${API_BASE_URL}/api/parse`, {
+      const res = await fetch(API_BASE_URL + '/api/parse', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ text })
@@ -879,36 +929,25 @@ Thanks for your time,
       if (d.error) { showToast('Parser: ' + d.error, 'error'); }
       else {
         document.getElementById('targetEmail').value = d.target_email || '';
-        document.getElementById('targetName').value = d.target_name || '';
-        document.getElementById('company').value = d.company_or_institute || '';
-        showToast('Fields auto-filled.', 'success');
+        document.getElementById('targetName').value  = d.target_name  || '';
+        document.getElementById('company').value     = d.company_or_institute || '';
+        showToast('Fields auto-filled via backend.', 'success');
       }
-    } catch(e) { showToast('Backend unreachable.', 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Auto-fill'; }
+    } catch(e) {
+      const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
+      if (!emailMatch) { showToast('No email found in pasted text.', 'error'); }
+      else {
+        const em = emailMatch[0].toLowerCase();
+        document.getElementById('targetEmail').value = em;
+        const domain = em.split('@')[1].split('.')[0];
+        document.getElementById('company').value = domain.charAt(0).toUpperCase() + domain.slice(1);
+        const nameMatch = text.match(/\b([A-Z][a-z]{1,20}(?:\s[A-Z][a-z]{1,20}){1,2})\b/);
+        if (nameMatch) document.getElementById('targetName').value = nameMatch[1];
+        showToast('Auto-filled (client-side fallback).', 'success');
+      }
+    } finally { btn.disabled = false; btn.textContent = 'Auto-fill'; }
   }
 
-  // ── File parser ───────────────────────────────────────────────
-  async function parseRecruiterFile() {
-    const input = document.getElementById('recruiterFile');
-    if (!input.files.length) { showToast('Select a file first.', 'error'); return; }
-
-    const fd = new FormData();
-    fd.append('file', input.files[0]);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/recruiters/parse-file`, { method:'POST', body:fd });
-      const d = await res.json();
-      if (d.status !== 'success') { showToast(d.message, 'error'); return; }
-      
-      window._lastParsedPairs = d.pairs || [];
-      document.getElementById('parsedRecruiterEmails').value = d.emails.join('\n');
-      showToast(`${d.count} target(s) extracted.`, 'success');
-      
-      if (d.pairs && d.pairs.length > 0 && !document.getElementById('targetEmail').value) {
-        document.getElementById('targetEmail').value = d.pairs[0].email;
-        if (d.pairs[0].name) document.getElementById('targetName').value = d.pairs[0].name;
-      }
-    } catch(e) { showToast('Parser error.', 'error'); }
-  }
 
   // ── Resume handling ───────────────────────────────────────────
   function handleResumeSelect(e) {
@@ -988,7 +1027,11 @@ Thanks for your time,
       const res = await fetch(`${API_BASE_URL}/api/campaign/send`, { method:'POST', body:fd });
       const result = await res.json();
       if (result.status === 'success' || result.status === 'scheduled') {
-        showToast(resumeFile ? 'Email sended with CV attached.' : 'Email sended (no CV attached).', 'success');
+        if (result.status === 'scheduled') {
+          showToast('Email scheduled successfully.', 'success');
+        } else {
+          showToast(resumeFile ? 'Email sent with CV attached.' : 'Email sent.', 'success');
+        }
         // Refresh SMTP bar
         await loadSmtpAccounts();
       } else {
