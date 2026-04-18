@@ -1,6 +1,6 @@
-flask
-flask-cors
-supabase
-cryptography
-python-dotenv
-python-docx
+flask==3.0.3
+flask-cors==4.0.1
+supabase==2.5.0
+cryptography==42.0.8
+python-dotenv==1.0.1
+python-docx==1.1.2
