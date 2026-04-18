@@ -197,11 +197,13 @@
   let filtered = [];
   const PER_PAGE = 20;
   let currentPage = 1;
+  let currentUid = null;
 
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { window.location.replace('auth.html'); return; }
     const userId = session.user.id;
+    currentUid = userId;
 
     const { data: profile } = await sb.from('profiles').select('*').eq('id', userId).single();
     const name = profile?.full_name || session.user.email.split('@')[0];
@@ -369,9 +371,14 @@
           ? `${d.replies_found} new repl${d.replies_found===1?'y':'ies'} found!`
           : 'No new replies.';
         showToast(msg, d.replies_found > 0 ? 'success' : 'success');
-        if (d.replies_found > 0) await loadHistory();
+        if (d.replies_found > 0) await loadHistory(currentUid);
       } else {
-        showToast(d.message || 'Check failed.', 'error');
+        // Give a specific hint for IMAP auth failures
+      const msg = d.message || 'Check failed.';
+      const hint = msg.toLowerCase().includes('imap') || msg.toLowerCase().includes('authentication')
+        ? msg + ' — Enable IMAP in Gmail: Settings → See all settings → Forwarding and POP/IMAP → Enable IMAP'
+        : msg;
+      showToast(hint, 'error');
       }
     } catch(e) { showToast('Could not reach server.', 'error'); }
     finally {
@@ -383,6 +390,24 @@
   const API_BASE_URL = '';
 
   function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ── Toast ─────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = ''; }, 4500);
+  }
 </script>
+  <div id="toast" style="position:fixed;bottom:28px;right:28px;background:#0d1117;border:1px solid rgba(0,242,255,0.1);padding:12px 20px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#c9d1d9;transform:translateY(20px);opacity:0;transition:all 0.25s;pointer-events:none;max-width:380px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.4);"></div>
+
+  <style>
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-left: 3px solid #00f2ff; }
+    #toast.error { border-left: 3px solid #ff4d6d; color: #ff4d6d; }
+  </style>
 </body>
 </html>
