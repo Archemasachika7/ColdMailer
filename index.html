@@ -310,18 +310,11 @@
     input[type="datetime-local"]:focus {
       border-color: rgba(0,242,255,0.5) !important;
       box-shadow: 0 0 0 3px rgba(0,242,255,0.07) !important;
-      outline: none !important;
     }
-    /* Chrome/Edge — the calendar icon and inner text */
     input[type="datetime-local"]::-webkit-calendar-picker-indicator {
       filter: invert(0.7) sepia(1) saturate(3) hue-rotate(150deg);
-      cursor: pointer;
-      opacity: 0.7;
+      cursor: pointer; opacity: 0.7;
     }
-    input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
-      opacity: 1;
-    }
-    /* The date/time segments inside the input */
     input[type="datetime-local"]::-webkit-datetime-edit { color: #c9d1d9; }
     input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper { color: #c9d1d9; }
     input[type="datetime-local"]::-webkit-datetime-edit-text { color: var(--text-dim); }
@@ -570,10 +563,15 @@
           <div class="panel">
             <div class="panel-header">
               <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Schedule Send</span>
-              <span class="badge badge-cyan" style="font-size: 9px;">Optional</span>
+              <div class="flex items-center gap-2">
+                <span class="badge badge-cyan" style="font-size:9px;">Optional</span>
+                <button onclick="runScheduled()" id="runScheduledBtn" class="btn-ghost" style="padding:4px 10px;font-size:10px;" title="Send all pending scheduled emails now">Run pending</button>
+              </div>
             </div>
             <div class="p-4">
-              <input type="datetime-local" id="sendAt" style="padding:9px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color-scheme: dark; background:#0a0e16 !important; border:1px solid rgba(0,242,255,0.18) !important; border-radius:3px; color:#c9d1d9 !important; width:100%;"/>
+              <input type="datetime-local" id="sendAt"/>
+              <div id="scheduledCount" class="mono text-[10px] mt-2" style="color:var(--cyan);display:none;"></div>
+              <div class="mono text-[10px] mt-2" style="color:var(--text-dim);">Leave blank to send immediately. Set a time to queue it.</div>
             </div>
           </div>
 
@@ -728,6 +726,7 @@ Thanks for your time,
 
     // Set default template
     switchTemplate('Industry');
+    loadScheduledCount();
   })();
 
   function renderNavAvatar(url, name) {
@@ -1067,8 +1066,12 @@ Thanks for your time,
       const res = await fetch(`${API_BASE_URL}/api/campaign/send`, { method:'POST', body:fd });
       const result = await res.json();
       if (result.status === 'success' || result.status === 'scheduled') {
-        showToast(resumeFile ? 'Email sended with CV attached.' : 'Email sended (no CV attached).', 'success');
-        // Refresh SMTP bar
+        if (result.status === 'scheduled') {
+          showToast('Email scheduled. Hit "Run pending" when ready to send.', 'success');
+          await loadScheduledCount();
+        } else {
+          showToast(resumeFile ? 'Email sent with CV attached.' : 'Email sent.', 'success');
+        }
         await loadSmtpAccounts();
       } else {
         showToast(result.message || 'Send failed.', 'error');
@@ -1079,6 +1082,50 @@ Thanks for your time,
       btn.disabled = false;
       document.getElementById('dispatchBtnInner').innerHTML = `<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>Send Email`;
     }
+  }
+
+
+  // ── Scheduled jobs ─────────────────────────────────────────────
+  async function loadScheduledCount() {
+    try {
+      const { data } = await sb.from('scheduled_jobs')
+        .select('id')
+        .eq('user_id', currentUserId)
+        .eq('status', 'pending');
+      const count = data?.length || 0;
+      const el = document.getElementById('scheduledCount');
+      if (count > 0) {
+        el.style.display = 'block';
+        el.textContent = `↻ ${count} email${count !== 1 ? 's' : ''} queued — hit "Run pending" to send now`;
+      } else {
+        el.style.display = 'none';
+      }
+    } catch(e) { /* silently fail */ }
+  }
+
+  async function runScheduled() {
+    const btn = document.getElementById('runScheduledBtn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      const res = await fetch('/api/scheduled/run', { method: 'POST' });
+      const d = await res.json();
+      if (d.status === 'done') {
+        if (d.sent > 0) {
+          showToast(`Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''}${d.failed > 0 ? ', ' + d.failed + ' failed' : ''}.`, 'success');
+        } else if (d.failed > 0) {
+          showToast(`${d.failed} job(s) failed. Check SMTP credentials.`, 'error');
+        } else {
+          showToast('No pending emails due right now.', 'success');
+        }
+        await loadSmtpAccounts();
+        await loadScheduledCount();
+      } else {
+        showToast(d.message || 'Failed to run scheduled jobs.', 'error');
+      }
+    } catch(e) { showToast('Could not reach server.', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Run pending'; }
   }
 
   // ── Toast ─────────────────────────────────────────────────────
