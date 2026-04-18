@@ -6,7 +6,7 @@ from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
-# from cryptography.fernet import Fernet  # disabled for debug
+from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from docx import Document
 
@@ -17,14 +17,14 @@ CORS(app)
 
 # Initialize Supabase and Encryption
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-# cipher_suite disabled for debug
+cipher_suite = Fernet(os.getenv("FERNET_KEY").encode())
 
 # --- HELPER FUNCTIONS ---
-def encrypt_password(password):  # NO-OP: plaintext
-    return password  # stored as plaintext
+def encrypt_password(password):
+    return cipher_suite.encrypt(password.encode()).decode()
 
-def decrypt_password(encrypted_password):  # NO-OP: plaintext
-    return encrypted_password  # returned as-is
+def decrypt_password(encrypted_password):
+    return cipher_suite.decrypt(encrypted_password.encode()).decode()
 
 # --- FALLBACK TEMPLATES (used if frontend sends no custom body) ---
 FALLBACK_TEMPLATES = {
@@ -154,24 +154,35 @@ def parse_recruiters_file():
 
 @app.route('/api/smtp/add', methods=['POST'])
 def add_smtp():
-    """Saves SMTP credentials — NO live auth test, plaintext storage for debug"""
+    """Tests SMTP credentials live, then encrypts and saves to Supabase."""
     data = request.json
     email = data.get('email')
     app_password = data.get('app_password')
     user_id = data.get('user_id')
 
+    # 1. Live SMTP authentication test
     try:
-        # NOTE: SMTP live-test removed for debugging. Saves directly.
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(email, app_password)
+        server.quit()
+    except smtplib.SMTPAuthenticationError:
+        return jsonify({"status": "error", "message": "SMTP authentication failed. Check email and App Password."}), 401
+    except Exception as e:
+        app.logger.exception("SMTP connection error")
+        return jsonify({"status": "error", "message": f"SMTP connection error: {str(e)}"}), 500
+
+    # 2. Encrypt and save to DB
+    try:
+        encrypted = encrypt_password(app_password)
         supabase.table('smtp_configs').insert({
             "user_id": user_id,
             "email_address": email,
-            "encrypted_app_password": app_password  # plaintext for now
+            "encrypted_app_password": encrypted
         }).execute()
-
-        return jsonify({"status": "success", "message": "Account saved!"})
+        return jsonify({"status": "success", "message": "Node deployed and encrypted."})
     except Exception:
-        app.logger.exception("SMTP save failed")
-        return jsonify({"status": "error", "message": "Database save failed. Check Supabase connection."}), 500
+        app.logger.exception("DB insert failed")
+        return jsonify({"status": "error", "message": "Database save failed. Check Supabase service_role key in .env."}), 500
 
 
 @app.route('/api/campaign/send', methods=['POST'])
@@ -195,7 +206,6 @@ def send_email():
     }
     target_email = request.form.get('target_email')
 
-    # Custom subject/body from frontend (editable templates)
     custom_subject = request.form.get('custom_subject', '').strip()
     custom_body = request.form.get('custom_body', '').strip()
 
@@ -207,11 +217,9 @@ def send_email():
 
         # 2. Resolve subject and body
         if custom_subject and custom_body:
-            # Use the editable template from the frontend
             subject = custom_subject.format(**target_data)
             body = custom_body.format(**target_data)
         else:
-            # Fallback to Python-side hardcoded template
             fallback_subject, fallback_body = FALLBACK_TEMPLATES.get(
                 template_type, FALLBACK_TEMPLATES["Custom"]
             )
@@ -233,7 +241,7 @@ def send_email():
                 filename=pdf_file.filename
             )
 
-        # 4. Send via SMTP
+        # 4. Send via SMTP — decrypt password in memory only
         server = smtplib.SMTP_SSL(account['smtp_host'], account['smtp_port'])
         server.login(account['email_address'], decrypt_password(account['encrypted_app_password']))
         server.send_message(msg)
