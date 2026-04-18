@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Dispatch Dashboard - The Void</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#00f2ff",
+                        "on-primary-container": "#006a71",
+                        "background": "#10131a",
+                        "surface-variant": "#32353c",
+                        "outline-variant": "#3a494b",
+                        "on-surface": "#e1e2eb",
+                        "on-surface-variant": "#b9cacb"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "body": ["Manrope", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Manrope', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Space Grotesk', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #32353c; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface flex h-screen overflow-hidden">
+    
+    <nav class="hidden md:flex flex-col h-full py-8 border-r border-[#3a494b]/20 bg-[#0b0e14] text-[#00f2ff] font-['Manrope'] text-sm font-medium w-64 shrink-0 z-40 relative">
+        <div class="px-6 mb-8 flex items-center gap-4">
+            <div>
+                <h1 class="font-['Space_Grotesk'] font-black text-[#e1e2eb] tracking-tight">The Architect</h1>
+                <p class="text-on-surface-variant text-xs">Cold Email SaaS</p>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-1 px-3">
+            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#00f2ff] bg-[#191c22] border-r-4 border-[#00f2ff]" href="index.html">
+                <span class="material-symbols-outlined">send</span> Dispatch
+            </a>
+            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#b9cacb] hover:bg-[#191c22] hover:text-[#e1e2eb]" href="account-manager.html">
+                <span class="material-symbols-outlined">manage_accounts</span> Account Manager
+            </a>
+        </div>
+    </nav>
+
+    <main class="flex-1 relative overflow-y-auto bg-background p-8">
+        <div class="w-full max-w-4xl mx-auto rounded-xl bg-surface-variant/40 backdrop-blur-md border border-outline-variant/20 p-8 shadow-2xl relative">
+            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6">Target Acquisition</h2>
+
+            <form id="dispatchForm" class="space-y-6">
+                <div class="w-full border border-dashed border-outline-variant/40 rounded-xl p-6 flex flex-col items-center bg-[#191c22]/30">
+                    <span class="material-symbols-outlined text-primary-container text-3xl mb-2">upload_file</span>
+                    <input type="file" id="resumePdf" accept="application/pdf" class="text-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-container file:text-on-primary-container hover:file:bg-[#74f5ff]">
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2 block">Application Type</label>
+                    <select id="templateType" class="w-full bg-[#191c22] border border-outline-variant/40 text-on-surface text-sm rounded-lg p-3 focus:border-primary-container focus:outline-none">
+                        <option value="Industry">Industry Grade</option>
+                        <option value="Research">Research Grade</option>
+                        <option value="Custom">Custom Text</option>
+                    </select>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Smart Paste Area</label>
+                        <button type="button" onclick="parseBio()" class="text-xs bg-primary-container text-on-primary-container px-3 py-1 rounded font-bold hover:bg-[#74f5ff]">Auto-Fill</button>
+                    </div>
+                    <textarea id="smartPaste" class="w-full bg-[#191c22]/50 border-b border-outline-variant/40 focus:border-primary-container focus:outline-none py-3 px-2 text-on-surface text-sm min-h-[100px]" placeholder="Paste recruiter bio here..."></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Target Name</label>
+                        <input id="targetName" type="text" class="w-full bg-transparent border-b border-outline-variant/40 focus:border-primary-container focus:outline-none py-2 text-on-surface text-sm" placeholder="e.g. Dr. Aris Thorne">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Target Email</label>
+                        <input id="targetEmail" type="email" class="w-full bg-transparent border-b border-outline-variant/40 focus:border-primary-container focus:outline-none py-2 text-on-surface text-sm" placeholder="e.g. a.thorne@company.com">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Company / Institute</label>
+                        <input id="company" type="text" class="w-full bg-transparent border-b border-outline-variant/40 focus:border-primary-container focus:outline-none py-2 text-on-surface text-sm" placeholder="e.g. Aether Labs">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Role</label>
+                        <input id="role" type="text" class="w-full bg-transparent border-b border-outline-variant/40 focus:border-primary-container focus:outline-none py-2 text-on-surface text-sm" placeholder="e.g. Lead Engineer">
+                    </div>
+                </div>
+
+                <input type="hidden" id="smtpAccountId" value="hardcoded_test_uuid_for_now">
+
+                <button type="submit" class="w-full mt-6 rounded-full bg-gradient-to-r from-primary-container to-[#74f5ff] text-on-primary-container py-4 font-bold tracking-widest uppercase hover:shadow-[0_0_20px_#00f2ff4d] transition-shadow flex justify-center items-center gap-2">
+                    <span class="material-symbols-outlined">rocket_launch</span> Dispatch Application
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        // Use the Codespace forwarded URL here once Flask is running
+        const API_BASE_URL = 'http://127.0.0.1:5000'; 
+
+        async function parseBio() {
+            const text = document.getElementById('smartPaste').value;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/parse`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text: text })
+                });
+                const data = await response.json();
+                
+                if(!data.error) {
+                    document.getElementById('targetEmail').value = data.target_email || '';
+                    document.getElementById('targetName').value = data.target_name || '';
+                    document.getElementById('company').value = data.company_or_institute || '';
+                } else {
+                    alert("Parser: " + data.error);
+                }
+            } catch (error) {
+                console.error("Error parsing:", error);
+            }
+        }
+
+        document.getElementById('dispatchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('target_name', document.getElementById('targetName').value);
+            formData.append('target_email', document.getElementById('targetEmail').value);
+            formData.append('company', document.getElementById('company').value);
+            formData.append('role', document.getElementById('role').value);
+            formData.append('template_type', document.getElementById('templateType').value);
+            formData.append('user_name', 'Archishman Das'); // Set your actual name here
+            
+            // To test, bypass Supabase initially or ensure your DB has this dummy data
+            formData.append('user_id', 'dummy_user_uuid');
+            formData.append('smtp_config_id', document.getElementById('smtpAccountId').value); 
+
+            const fileInput = document.getElementById('resumePdf');
+            if (fileInput.files.length > 0) {
+                formData.append('resume', fileInput.files[0]);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/campaign/send`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                alert(result.status === 'success' ? "Success: " + result.message : "Error: " + result.message);
+            } catch (error) {
+                alert("Failed to connect to backend engine.");
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>
