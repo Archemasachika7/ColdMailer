@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dispatch Dashboard — The Architect</title>
+  <title>Send Dashboard — The Architect</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -212,7 +212,7 @@
       border: 1px solid;
     }
     .badge-cyan { color: var(--cyan); border-color: rgba(0,242,255,0.2); background: rgba(0,242,255,0.06); }
-    .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+    .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
 
     /* Spinner */
@@ -303,10 +303,10 @@
     <!-- Brand -->
     <div class="px-5 mb-8">
       <div class="flex items-center gap-2 mb-1">
-        <div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]" style="animation:pulse 2s infinite"></div>
+        <div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]" ></div>
         <span class="syne font-bold text-white text-base tracking-widest uppercase">The Architect</span>
       </div>
-      <div class="mono text-[10px] text-[var(--text-dim)] tracking-[0.15em] ml-4">// DISPATCH SYSTEM</div>
+      <div class="mono text-[10px] text-[var(--text-dim)] tracking-[0.15em] ml-4">Send cold emails</div>
     </div>
 
     <!-- User profile row -->
@@ -315,7 +315,7 @@
         <div id="navAvatarWrap"></div>
         <div class="overflow-hidden">
           <div id="navUserName" class="text-sm font-semibold text-white truncate">Loading...</div>
-          <div id="navUserEmail" class="mono text-[10px] text-[var(--text-dim)] truncate"></div>
+          
         </div>
       </div>
     </div>
@@ -323,10 +323,10 @@
     <!-- Links -->
     <div class="flex-1 px-3 space-y-1">
       <a href="index.html" class="nav-link active">
-        <span class="material-symbols-outlined text-[18px]">rocket_launch</span> Dispatch
+        <span class="material-symbols-outlined text-[18px]">rocket_launch</span> Send
       </a>
       <a href="account-manager.html" class="nav-link">
-        <span class="material-symbols-outlined text-[18px]">manage_accounts</span> SMTP Nodes
+        <span class="material-symbols-outlined text-[18px]">manage_accounts</span> Email Accounts
       <a href="history.html" class="nav-link">
         <span class="material-symbols-outlined text-[18px]">history</span> History
       </a>
@@ -339,7 +339,7 @@
     <!-- Logout -->
     <div class="px-3 mt-4 pt-4 border-t border-[var(--border)]">
       <button onclick="logout()" class="nav-link w-full text-left" style="color:#ff4d6d;">
-        <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Terminate
+        <span class="material-symbols-outlined text-[18px]">logout</span> Log out
       </button>
     </div>
   </nav>
@@ -351,8 +351,8 @@
       <!-- Page header -->
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="syne text-2xl font-bold text-white tracking-wide">Target Acquisition</h1>
-          <p class="mono text-[11px] text-[var(--text-dim)] tracking-widest mt-1">// COMPOSE & DISPATCH MODULE</p>
+          <h1 class="syne text-2xl font-bold text-white tracking-wide">New Email</h1>
+          
         </div>
         <div class="badge badge-cyan"><span class="badge-dot"></span> Online</div>
       </div>
@@ -384,7 +384,7 @@
           <div class="panel">
             <div class="panel-header">
               <span class="mono text-[11px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Smart Paste</span>
-              <button onclick="parseBio()" class="btn-cyan" style="padding:6px 14px; font-size:11px;" id="parseBtn">Auto-Fill ↗</button>
+              <button onclick="parseBio()" class="btn-cyan" style="padding:6px 14px; font-size:11px;" id="parseBtn">Auto-fill</button>
             </div>
             <div class="p-4">
               <textarea id="smartPaste" rows="4" style="padding:10px 12px;" placeholder="Paste recruiter bio, LinkedIn snippet, or job post here — Auto-Fill extracts email, name, company automatically..."></textarea>
@@ -478,11 +478,11 @@
             </div>
           </div>
 
-          <!-- Dispatch button -->
-          <button id="dispatchBtn" onclick="dispatch()" class="btn-cyan w-full py-4 text-sm tracking-widest" style="font-size:13px; letter-spacing:0.2em;">
-            <span id="dispatchBtnInner">
+          <!-- Send button -->
+          <button id="sendBtn" onclick="send()" class="btn-cyan w-full py-4 text-sm tracking-widest" style="font-size:13px; letter-spacing:0.2em;">
+            <span id="sendBtnInner">
               <span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>
-              DISPATCH APPLICATION
+              Send Email
             </span>
           </button>
 
@@ -653,6 +653,123 @@ Thanks for your time,
     document.getElementById('templateHint').textContent = hints[type];
   }
 
+
+  // ── Bulk send state ───────────────────────────────────────────
+  let bulkMode = false;
+  let bulkTargets = []; // [{email, name, company, role}]
+
+  function toggleBulk() {
+    bulkMode = !bulkMode;
+    document.getElementById('bulkBody').style.display = bulkMode ? 'block' : 'none';
+    document.getElementById('bulkToggleBtn').textContent = bulkMode ? 'Disable' : 'Enable';
+    document.getElementById('dispatchBtnInner').innerHTML = bulkMode
+      ? '<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">send</span>Send to All (' + bulkTargets.length + ')'
+      : '<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>Send Email';
+  }
+
+  function addBulkTarget() {
+    const email   = document.getElementById('bulkEmailInput').value.trim();
+    const name    = document.getElementById('bulkNameInput').value.trim();
+    if (!email) return;
+    bulkTargets.push({ email, name, company: '', role: '' });
+    document.getElementById('bulkEmailInput').value = '';
+    document.getElementById('bulkNameInput').value  = '';
+    renderBulkList();
+  }
+
+  function removeBulkTarget(i) {
+    bulkTargets.splice(i, 1);
+    renderBulkList();
+  }
+
+  function renderBulkList() {
+    const list = document.getElementById('bulkTargetList');
+    list.innerHTML = bulkTargets.map((t, i) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#0a0e16;border:1px solid var(--border);border-radius:3px;">
+        <span class="mono text-[12px]" style="flex:1;color:var(--text);">${t.email}</span>
+        <span class="mono text-[11px]" style="color:var(--text-dim);">${t.name || '—'}</span>
+        <button onclick="removeBulkTarget(${i})" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:14px;">×</button>
+      </div>`).join('');
+    document.getElementById('bulkStats').textContent =
+      bulkTargets.length + ' target' + (bulkTargets.length !== 1 ? 's' : '') + ' queued';
+    if (bulkMode) {
+      document.getElementById('dispatchBtnInner').innerHTML =
+        '<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">send</span>Send to All (' + bulkTargets.length + ')';
+    }
+  }
+
+  // Auto-populate bulk targets when file parser runs
+  const _origParseRecruiterFile = parseRecruiterFile;
+  parseRecruiterFile = async function() {
+    await _origParseRecruiterFile();
+    // If bulk mode on, offer to add parsed emails
+    if (bulkMode) {
+      const raw = document.getElementById('parsedRecruiterEmails').value;
+      if (!raw) return;
+      const lines = raw.split('\n').filter(Boolean);
+      lines.forEach(line => {
+        const email = line.trim();
+        if (email && !bulkTargets.find(t => t.email === email)) {
+          bulkTargets.push({ email, name: '', company: '', role: '' });
+        }
+      });
+      renderBulkList();
+      showToast('Added ' + lines.length + ' targets to bulk queue.', 'success');
+    }
+  };
+
+  // ── Smart dispatch — routes to single or bulk ─────────────────
+  async function smartDispatch() {
+    if (bulkMode) {
+      await bulkDispatch();
+    } else {
+      await dispatch();
+    }
+  }
+
+  // ── Bulk dispatch ──────────────────────────────────────────────
+  async function bulkDispatch() {
+    if (bulkTargets.length === 0) { showToast('Add some targets first.', 'error'); return; }
+    const smtpId = document.getElementById('smtpAccountId').value;
+    if (!smtpId) { showToast('Select an email account.', 'error'); return; }
+
+    const btn = document.getElementById('dispatchBtn');
+    btn.disabled = true;
+    document.getElementById('dispatchBtnInner').innerHTML = '<span class="spinner"></span> Sending...';
+
+    const fd = new FormData();
+    fd.append('user_id',        currentUserId);
+    fd.append('smtp_config_id', smtpId);
+    fd.append('template_type',  currentTemplate);
+    fd.append('custom_subject', document.getElementById('emailSubject').value.trim());
+    fd.append('custom_body',    document.getElementById('templateBody').value.trim());
+    fd.append('user_name',      currentUserName);
+    fd.append('delay_seconds',  '4');
+    fd.append('targets',        JSON.stringify(bulkTargets));
+    if (resumeFile) fd.append('resume', new File([resumeFile], resumeFile.name, { type: 'application/pdf' }));
+
+    try {
+      const res    = await fetch('/api/campaign/bulk', { method: 'POST', body: fd });
+      const result = await res.json();
+      if (result.status === 'done') {
+        showToast(`Sent ${result.sent}, failed ${result.failed}, skipped ${result.skipped}.`,
+                  result.sent > 0 ? 'success' : 'error');
+        if (result.sent > 0) {
+          bulkTargets = [];
+          renderBulkList();
+          await loadSmtpAccounts();
+        }
+      } else {
+        showToast(result.message || 'Bulk send failed.', 'error');
+      }
+    } catch(e) { showToast('Could not reach server.', 'error'); }
+    finally {
+      btn.disabled = false;
+      document.getElementById('dispatchBtnInner').innerHTML =
+        '<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">send</span>Send to All (' + bulkTargets.length + ')';
+    }
+  }
+
   // ── Smart Paste parser ────────────────────────────────────────
   async function parseBio() {
     const text = document.getElementById('smartPaste').value.trim();
@@ -674,7 +791,7 @@ Thanks for your time,
         showToast('Fields auto-filled.', 'success');
       }
     } catch(e) { showToast('Backend unreachable.', 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Auto-Fill ↗'; }
+    finally { btn.disabled = false; btn.textContent = 'Auto-fill'; }
   }
 
   // ── File parser ───────────────────────────────────────────────
@@ -734,8 +851,8 @@ Thanks for your time,
     document.getElementById('cvFrame').src = '';
   }
 
-  // ── Dispatch ──────────────────────────────────────────────────
-  async function dispatch() {
+  // ── Send ──────────────────────────────────────────────────
+  async function send() {
     const targetEmail = document.getElementById('targetEmail').value.trim();
     const targetName = document.getElementById('targetName').value.trim();
     const company = document.getElementById('company').value.trim();
@@ -747,9 +864,9 @@ Thanks for your time,
     if (!targetEmail) { showToast('Target email is required.', 'error'); return; }
     if (!smtpId) { showToast('Select an SMTP sender node.', 'error'); return; }
 
-    const btn = document.getElementById('dispatchBtn');
+    const btn = document.getElementById('sendBtn');
     btn.disabled = true;
-    document.getElementById('dispatchBtnInner').innerHTML = `<span class="spinner"></span> Dispatching...`;
+    document.getElementById('sendBtnInner').innerHTML = `<span class="spinner"></span> Sending...`;
 
     const fd = new FormData();
     fd.append('user_id', currentUserId);
@@ -762,6 +879,8 @@ Thanks for your time,
     fd.append('user_name', currentUserName);
     fd.append('custom_subject', subject);
     fd.append('custom_body', body);
+    const sendAt = document.getElementById('sendAt')?.value;
+    if (sendAt) fd.append('send_at', new Date(sendAt).toISOString());
     if (resumeFile) {
       // Pass as a proper Blob with filename so Flask receives it as a named file
       fd.append('resume', new File([resumeFile], resumeFile.name, { type: 'application/pdf' }));
@@ -770,18 +889,18 @@ Thanks for your time,
     try {
       const res = await fetch(`${API_BASE_URL}/api/campaign/send`, { method:'POST', body:fd });
       const result = await res.json();
-      if (result.status === 'success') {
-        showToast(resumeFile ? 'Email dispatched with CV attached.' : 'Email dispatched (no CV attached).', 'success');
+      if (result.status === 'success' || result.status === 'scheduled') {
+        showToast(resumeFile ? 'Email sended with CV attached.' : 'Email sended (no CV attached).', 'success');
         // Refresh SMTP bar
         await loadSmtpAccounts();
       } else {
-        showToast(result.message || 'Dispatch failed.', 'error');
+        showToast(result.message || 'Send failed.', 'error');
       }
     } catch(e) {
       showToast('Cannot reach backend engine.', 'error');
     } finally {
       btn.disabled = false;
-      document.getElementById('dispatchBtnInner').innerHTML = `<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>DISPATCH APPLICATION`;
+      document.getElementById('sendBtnInner').innerHTML = `<span class="material-symbols-outlined align-middle mr-2" style="font-size:18px;">rocket_launch</span>Send Email`;
     }
   }
 
