@@ -565,32 +565,34 @@ Thanks for your time,
   let resumeFile = null;
   let resumeObjectUrl = null;
   let smtpAccounts = [];
+  switchTemplate('Industry');
 
   // ── Boot ─────────────────────────────────────────────────────
   (async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.replace('auth.html'); return; }
-    currentUserId = session.user.id;
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.replace('auth.html'); return; }
+      currentUserId = session.user.id;
 
-    // Load profile
-    const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
-    if (profile) {
-      currentUserName = profile.full_name || session.user.email.split('@')[0];
-      document.getElementById('navUserName').textContent = currentUserName;
-      document.getElementById('navUserEmail').textContent = session.user.email;
-      renderNavAvatar(profile.avatar_url, currentUserName);
-    } else {
-      currentUserName = session.user.email.split('@')[0];
-      document.getElementById('navUserName').textContent = currentUserName;
-      document.getElementById('navUserEmail').textContent = session.user.email;
-      renderNavAvatar(null, currentUserName);
+      // Load profile
+      const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
+      if (profile) {
+        currentUserName = profile.full_name || session.user.email.split('@')[0];
+        document.getElementById('navUserName').textContent = currentUserName;
+        document.getElementById('navUserEmail').textContent = session.user.email;
+        renderNavAvatar(profile.avatar_url, currentUserName);
+      } else {
+        currentUserName = session.user.email.split('@')[0];
+        document.getElementById('navUserName').textContent = currentUserName;
+        document.getElementById('navUserEmail').textContent = session.user.email;
+        renderNavAvatar(null, currentUserName);
+      }
+
+      // Load SMTP accounts
+      await loadSmtpAccounts();
+    } catch (e) {
+      showToast('Could not load user data from Supabase.', 'error');
     }
-
-    // Load SMTP accounts
-    await loadSmtpAccounts();
-
-    // Set default template
-    switchTemplate('Industry');
   })();
 
   function renderNavAvatar(url, name) {
@@ -610,7 +612,9 @@ Thanks for your time,
 
   // ── SMTP accounts ─────────────────────────────────────────────
   async function loadSmtpAccounts() {
-    const { data, error } = await sb.from('smtp_configs').select('*').order('created_at');
+    let query = sb.from('smtp_configs').select('*').order('created_at');
+    if (currentUserId) query = query.eq('user_id', currentUserId);
+    const { data, error } = await query;
     if (error || !data || data.length === 0) {
       document.getElementById('smtpAccountId').innerHTML = '<option value="">— No SMTP nodes. Add one in Account Manager. —</option>';
       return;
