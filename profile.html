@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Profile — The Architect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --cyan:#00f2ff; --cyan-dim:rgba(0,242,255,0.08);
+      --bg:#080b10; --surface:#0d1117; --surface2:#111720;
+      --border:rgba(0,242,255,0.1); --border-mid:rgba(0,242,255,0.22);
+      --text:#c9d1d9; --text-dim:#58a6a6; --red:#ff4d6d;
+    }
+    * { box-sizing: border-box; }
+    body { font-family:'Manrope',sans-serif; background:var(--bg); color:var(--text); }
+    .mono { font-family:'IBM Plex Mono',monospace; }
+    .syne { font-family:'Syne',sans-serif; }
+    body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(0,242,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,242,255,0.02) 1px,transparent 1px); background-size:48px 48px; pointer-events:none; z-index:0; }
+    ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-thumb{background:rgba(0,242,255,0.15);border-radius:2px;}
+    nav{background:#060810;border-right:1px solid var(--border);}
+    .nav-link{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:4px;font-size:13px;font-weight:500;color:var(--text-dim);text-decoration:none;transition:all 0.15s;position:relative;cursor:pointer;border:none;background:none;width:100%;}
+    .nav-link:hover{background:rgba(0,242,255,0.05);color:var(--text);}
+    .nav-link.active{color:var(--cyan);background:rgba(0,242,255,0.07);}
+    .nav-link.active::after{content:'';position:absolute;right:0;top:20%;bottom:20%;width:2px;background:var(--cyan);border-radius:2px;box-shadow:0 0 8px var(--cyan);}
+    .nav-avatar{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border-mid);object-fit:cover;}
+    .nav-avatar-placeholder{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border-mid);background:#0d1a1a;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--cyan);}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+    @keyframes spin{to{transform:rotate(360deg);}}
+
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:4px;}
+    .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+
+    /* Avatar upload area */
+    .avatar-zone{
+      width:96px;height:96px;border-radius:50%;
+      border:2px dashed var(--border-mid);
+      position:relative;cursor:pointer;overflow:hidden;
+      transition:border-color 0.2s;flex-shrink:0;
+    }
+    .avatar-zone:hover{border-color:var(--cyan);}
+    .avatar-zone img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+    .avatar-zone .overlay{
+      position:absolute;inset:0;border-radius:50%;
+      background:rgba(0,0,0,0.55);
+      display:flex;align-items:center;justify-content:center;
+      opacity:0;transition:opacity 0.2s;
+    }
+    .avatar-zone:hover .overlay{opacity:1;}
+    .avatar-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+    .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:var(--cyan);}
+
+    /* Form */
+    .field-label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
+    input[type="text"],input[type="email"],input[type="password"]{
+      width:100%;background:#0a0e16!important;border:1px solid var(--border-mid)!important;
+      border-radius:3px;padding:10px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px;
+      color:var(--text)!important;outline:none;transition:border-color 0.15s,box-shadow 0.15s;
+      -webkit-appearance:none;appearance:none;
+    }
+    input:focus{border-color:rgba(0,242,255,0.5)!important;box-shadow:0 0 0 3px rgba(0,242,255,0.07)!important;}
+    input::placeholder{color:rgba(88,166,166,0.35)!important;opacity:1!important;}
+    input:-webkit-autofill,input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #0a0e16 inset!important;-webkit-text-fill-color:var(--text)!important;}
+    input:disabled{opacity:0.5;cursor:not-allowed;}
+
+    .btn-cyan{background:var(--cyan);color:#030912;font-weight:700;font-size:12px;letter-spacing:0.1em;padding:10px 24px;border:none;border-radius:3px;cursor:pointer;transition:all 0.15s;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;}
+    .btn-cyan:hover{box-shadow:0 0 20px rgba(0,242,255,0.35);}
+    .btn-cyan:disabled{opacity:0.45;cursor:not-allowed;}
+    .btn-ghost{background:transparent;border:1px solid var(--border-mid);color:var(--text-dim);font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;padding:8px 16px;border-radius:3px;cursor:pointer;transition:all 0.15s;}
+    .btn-ghost:hover{border-color:var(--cyan);color:var(--cyan);}
+    .btn-danger{background:transparent;border:1px solid rgba(255,77,109,0.3);color:var(--red);font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;padding:8px 16px;border-radius:3px;cursor:pointer;transition:all 0.15s;}
+    .btn-danger:hover{border-color:var(--red);background:rgba(255,77,109,0.08);}
+
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(0,242,255,0.2);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.65s linear infinite;}
+
+    #toast{position:fixed;bottom:28px;right:28px;background:var(--surface);border:1px solid var(--border);padding:12px 20px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text);transform:translateY(20px);opacity:0;transition:all 0.25s;pointer-events:none;max-width:320px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.4);}
+    #toast.show{transform:translateY(0);opacity:1;}
+    #toast.success{border-left:3px solid var(--cyan);}
+    #toast.error{border-left:3px solid var(--red);color:var(--red);}
+
+    /* CV list */
+    .cv-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background 0.1s;}
+    .cv-item:last-child{border-bottom:none;}
+    .cv-item:hover{background:rgba(0,242,255,0.03);}
+    .cv-icon{width:36px;height:36px;border-radius:3px;background:#0a0e16;border:1px solid var(--border-mid);display:flex;align-items:center;justify-content:center;color:var(--red);flex-shrink:0;}
+  </style>
+</head>
+<body class="flex h-screen overflow-hidden relative">
+
+  <!-- ── SIDEBAR ── -->
+  <nav class="hidden md:flex flex-col h-full w-60 shrink-0 py-6 z-40">
+    <div class="px-5 mb-8">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="w-2 h-2 rounded-full" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s infinite;"></div>
+        <span class="syne font-bold text-white text-base tracking-widest uppercase">The Architect</span>
+      </div>
+      <div class="mono text-[10px] tracking-[0.15em] ml-4" style="color:var(--text-dim);">// DISPATCH SYSTEM</div>
+    </div>
+    <div class="px-4 mb-6">
+      <div class="flex items-center gap-3 px-3 py-3 rounded-md" style="background:rgba(0,242,255,0.04);border:1px solid var(--border);">
+        <div id="navAvatarWrap"></div>
+        <div class="overflow-hidden">
+          <div id="navUserName" class="text-sm font-semibold text-white truncate">—</div>
+          <div id="navUserEmail" class="mono text-[10px] truncate" style="color:var(--text-dim);"></div>
+        </div>
+      </div>
+    </div>
+    <div class="flex-1 px-3 space-y-1">
+      <a href="index.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">rocket_launch</span> Dispatch</a>
+      <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> SMTP Nodes</a>
+      <a href="history.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">history</span> History</a>
+      <a href="profile.html" class="nav-link active"><span class="material-symbols-outlined text-[18px]">person</span> Profile</a>
+    </div>
+    <div class="px-3 mt-4 pt-4" style="border-top:1px solid var(--border);">
+      <button onclick="logout()" class="nav-link" style="color:var(--red);">
+        <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Terminate
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── MAIN ── -->
+  <main class="flex-1 overflow-y-auto p-6 relative z-10">
+    <div class="max-w-3xl mx-auto space-y-6">
+
+      <div>
+        <h1 class="syne text-2xl font-bold text-white tracking-wide">Operator Profile</h1>
+        <p class="mono text-[11px] mt-1 tracking-widest" style="color:var(--text-dim);">// IDENTITY CONFIGURATION</p>
+      </div>
+
+      <!-- Profile card -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="mono text-[11px] font-semibold tracking-widest uppercase" style="color:var(--text-dim);">Identity</span>
+          <span class="mono text-[10px]" style="color:var(--text-dim);" id="lastUpdated"></span>
+        </div>
+        <div class="p-6">
+          <!-- Avatar + name row -->
+          <div class="flex items-center gap-6 mb-6 pb-6" style="border-bottom:1px solid var(--border);">
+            <div class="avatar-zone" id="avatarZone">
+              <div class="avatar-placeholder" id="avatarPlaceholder">?</div>
+              <img id="avatarImg" style="display:none;" alt="avatar"/>
+              <div class="overlay">
+                <span class="material-symbols-outlined text-white" style="font-size:20px;">photo_camera</span>
+              </div>
+              <input type="file" id="avatarInput" accept="image/jpeg,image/png,image/webp" onchange="handleAvatarChange(event)"/>
+            </div>
+            <div>
+              <div class="font-bold text-white text-lg" id="profileNameDisplay">—</div>
+              <div class="mono text-[12px] mt-1" style="color:var(--text-dim);" id="profileEmailDisplay">—</div>
+              <div class="mono text-[10px] mt-2" style="color:var(--text-dim);">Click avatar to update photo</div>
+            </div>
+          </div>
+
+          <!-- Edit fields -->
+          <div class="space-y-4">
+            <div>
+              <label class="field-label">Full Name</label>
+              <input type="text" id="editName" placeholder="Your full name"/>
+            </div>
+            <div>
+              <label class="field-label">Email Address</label>
+              <input type="email" id="editEmail" disabled/>
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-6">
+            <button class="btn-cyan" id="saveProfileBtn" onclick="saveProfile()">
+              <span id="saveProfileText">Save Changes</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password change -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="mono text-[11px] font-semibold tracking-widest uppercase" style="color:var(--text-dim);">Change Password</span>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="field-label">New Password</label>
+            <input type="password" id="newPassword" placeholder="min 8 characters"/>
+          </div>
+          <div>
+            <label class="field-label">Confirm Password</label>
+            <input type="password" id="confirmPassword" placeholder="repeat new password"/>
+          </div>
+          <button class="btn-ghost" id="changePassBtn" onclick="changePassword()">
+            <span id="changePassText">Update Password</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Uploaded CVs -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="mono text-[11px] font-semibold tracking-widest uppercase" style="color:var(--text-dim);">Stored Resumes</span>
+          <label class="btn-ghost" style="cursor:pointer;">
+            <span class="material-symbols-outlined text-[13px] align-middle mr-1">upload</span>Upload CV
+            <input type="file" accept="application/pdf" class="hidden" onchange="uploadResume(event)"/>
+          </label>
+        </div>
+        <div id="cvList">
+          <div class="cv-item"><span class="mono text-[12px]" style="color:var(--text-dim);">Loading resumes...</span></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- CV viewer modal -->
+  <div id="cvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border-mid);border-radius:4px;width:90%;max-width:860px;height:88vh;display:flex;flex-direction:column;">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span class="mono text-[11px] font-semibold tracking-widest uppercase" style="color:var(--text-dim);">CV Preview</span>
+        <button class="btn-ghost" onclick="closeCvModal()">✕ Close</button>
+      </div>
+      <iframe id="cvFrame" style="flex:1;border:none;background:#fff;"></iframe>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+  const SUPABASE_URL='https://ioqgduqyfdcjvafyytxz.supabase.co';
+  const SUPABASE_ANON_KEY='sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+  const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+  let userId=null, userEmail=null, newAvatarFile=null;
+
+  (async()=>{
+    const{data:{session}}=await sb.auth.getSession();
+    if(!session){window.location.replace('auth.html');return;}
+    userId=session.user.id; userEmail=session.user.email;
+
+    const{data:profile}=await sb.from('profiles').select('*').eq('id',userId).single();
+    const name=profile?.full_name||userEmail.split('@')[0];
+
+    // Nav
+    document.getElementById('navUserName').textContent=name;
+    document.getElementById('navUserEmail').textContent=userEmail;
+    renderNavAvatar(profile?.avatar_url,name);
+
+    // Form
+    document.getElementById('editName').value=profile?.full_name||'';
+    document.getElementById('editEmail').value=userEmail;
+    document.getElementById('profileNameDisplay').textContent=name;
+    document.getElementById('profileEmailDisplay').textContent=userEmail;
+    document.getElementById('avatarPlaceholder').textContent=name.slice(0,2).toUpperCase();
+    if(profile?.updated_at){
+      document.getElementById('lastUpdated').textContent='Updated '+new Date(profile.updated_at).toLocaleDateString();
+    }
+    if(profile?.avatar_url){
+      document.getElementById('avatarImg').src=profile.avatar_url;
+      document.getElementById('avatarImg').style.display='block';
+      document.getElementById('avatarPlaceholder').style.display='none';
+    }
+
+    await loadResumes();
+  })();
+
+  function renderNavAvatar(url,name){
+    const wrap=document.getElementById('navAvatarWrap');
+    if(url){wrap.innerHTML=`<img src="${url}" class="nav-avatar" alt="${name}"/>`;}
+    else{const i=name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();wrap.innerHTML=`<div class="nav-avatar-placeholder">${i}</div>`;}
+  }
+  async function logout(){await sb.auth.signOut();window.location.replace('auth.html');}
+
+  // ── Avatar change ──────────────────────────────────────────────
+  function handleAvatarChange(e){
+    const file=e.target.files[0];
+    if(!file)return;
+    if(file.size>5*1024*1024){showToast('Image must be under 5MB.','error');return;}
+    newAvatarFile=file;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      document.getElementById('avatarImg').src=ev.target.result;
+      document.getElementById('avatarImg').style.display='block';
+      document.getElementById('avatarPlaceholder').style.display='none';
+    };
+    reader.readAsDataURL(file);
+    showToast('Click "Save Changes" to apply the new photo.','success');
+  }
+
+  // ── Save profile ───────────────────────────────────────────────
+  async function saveProfile(){
+    const name=document.getElementById('editName').value.trim();
+    if(!name){showToast('Name cannot be empty.','error');return;}
+    const btn=document.getElementById('saveProfileBtn');
+    const span=document.getElementById('saveProfileText');
+    btn.disabled=true; span.innerHTML=`<span class="spinner"></span>`;
+
+    let avatarUrl=null;
+
+    // Upload new avatar if selected
+    if(newAvatarFile){
+      const ext=newAvatarFile.name.split('.').pop();
+      const path=`${userId}/avatar.${ext}`;
+      const{error:upErr}=await sb.storage.from('avatars').upload(path,newAvatarFile,{upsert:true});
+      if(!upErr){
+        const{data:urlData}=sb.storage.from('avatars').getPublicUrl(path);
+        avatarUrl=urlData.publicUrl+'?t='+Date.now();
+      }
+    }
+
+    const update={id:userId,full_name:name,updated_at:new Date().toISOString()};
+    if(avatarUrl) update.avatar_url=avatarUrl;
+
+    const{error}=await sb.from('profiles').upsert(update);
+    btn.disabled=false; span.textContent='Save Changes';
+
+    if(error){showToast('Save failed: '+error.message,'error');}
+    else{
+      document.getElementById('profileNameDisplay').textContent=name;
+      renderNavAvatar(avatarUrl||document.getElementById('avatarImg').src, name);
+      document.getElementById('navUserName').textContent=name;
+      newAvatarFile=null;
+      showToast('Profile updated.','success');
+    }
+  }
+
+  // ── Change password ────────────────────────────────────────────
+  async function changePassword(){
+    const np=document.getElementById('newPassword').value;
+    const cp=document.getElementById('confirmPassword').value;
+    if(np.length<8){showToast('Password must be at least 8 characters.','error');return;}
+    if(np!==cp){showToast('Passwords do not match.','error');return;}
+    const btn=document.getElementById('changePassBtn');
+    const span=document.getElementById('changePassText');
+    btn.disabled=true; span.innerHTML=`<span class="spinner"></span>`;
+    const{error}=await sb.auth.updateUser({password:np});
+    btn.disabled=false; span.textContent='Update Password';
+    if(error){showToast(error.message,'error');}
+    else{
+      document.getElementById('newPassword').value='';
+      document.getElementById('confirmPassword').value='';
+      showToast('Password updated successfully.','success');
+    }
+  }
+
+  // ── Resumes ────────────────────────────────────────────────────
+  async function loadResumes(){
+    const{data,error}=await sb.storage.from('resumes').list(`${userId}/`,{sortBy:{column:'created_at',order:'desc'}});
+    const list=document.getElementById('cvList');
+    if(error||!data||data.length===0){
+      list.innerHTML=`<div class="cv-item"><span class="mono text-[12px]" style="color:var(--text-dim);">No resumes stored. Upload one below.</span></div>`;
+      return;
+    }
+    list.innerHTML=data.map(f=>`
+      <div class="cv-item">
+        <div class="cv-icon"><span class="material-symbols-outlined" style="font-size:16px;">picture_as_pdf</span></div>
+        <div class="flex-1 overflow-hidden">
+          <div class="text-sm font-medium text-white truncate">${escHtml(f.name)}</div>
+          <div class="mono text-[10px] mt-0.5" style="color:var(--text-dim);">${formatBytes(f.metadata?.size||0)} · ${new Date(f.created_at||Date.now()).toLocaleDateString()}</div>
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <button class="btn-ghost" style="padding:5px 10px;" onclick="previewResume('${f.name}')">View</button>
+          <button class="btn-danger" style="padding:5px 10px;" onclick="deleteResume('${f.name}')">Del</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function uploadResume(e){
+    const file=e.target.files[0]; if(!file)return;
+    if(file.size>10*1024*1024){showToast('PDF must be under 10MB.','error');return;}
+    const path=`${userId}/${file.name}`;
+    showToast('Uploading...','success');
+    const{error}=await sb.storage.from('resumes').upload(path,file,{upsert:true});
+    if(error){showToast('Upload failed: '+error.message,'error');}
+    else{showToast('Resume uploaded.','success'); await loadResumes();}
+    e.target.value='';
+  }
+
+  async function previewResume(name){
+    const{data,error}=await sb.storage.from('resumes').createSignedUrl(`${userId}/${name}`,300);
+    if(error||!data){showToast('Cannot open file.','error');return;}
+    document.getElementById('cvFrame').src=data.signedUrl;
+    document.getElementById('cvModal').style.display='flex';
+  }
+  function closeCvModal(){document.getElementById('cvModal').style.display='none';document.getElementById('cvFrame').src='';}
+
+  async function deleteResume(name){
+    if(!confirm(`Delete "${name}"?`))return;
+    const{error}=await sb.storage.from('resumes').remove([`${userId}/${name}`]);
+    if(error){showToast('Delete failed.','error');}
+    else{showToast('Deleted.','success'); await loadResumes();}
+  }
+
+  function formatBytes(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+  function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  let toastTimer;
+  function showToast(msg,type='success'){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.className=`show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>{t.className='';},3500);
+  }
+</script>
+</body>
+</html>
