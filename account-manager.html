@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Account Manager - The Void</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#00f2ff",
+                        "background": "#10131a",
+                        "surface-variant": "#32353c",
+                        "outline-variant": "#3a494b",
+                        "error": "#ffb4ab",
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "body": ["Manrope", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Manrope', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Space Grotesk', sans-serif; }
+    </style>
+</head>
+<body class="bg-[#10131a] text-[#e1e2eb] flex h-screen overflow-hidden">
+
+    <nav class="hidden md:flex flex-col h-full py-8 border-r border-[#3a494b]/20 bg-[#0b0e14] text-[#00f2ff] font-['Manrope'] text-sm font-medium w-64 shrink-0 z-40 relative">
+        <div class="px-6 mb-8 flex items-center gap-4">
+            <div>
+                <h1 class="font-['Space_Grotesk'] font-black text-[#e1e2eb] tracking-tight">The Architect</h1>
+                <p class="text-[#b9cacb] text-xs">Cold Email SaaS</p>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-1 px-3">
+            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#b9cacb] hover:bg-[#191c22] hover:text-[#e1e2eb]" href="index.html">
+                <span class="material-symbols-outlined">send</span> Dispatch
+            </a>
+            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#00f2ff] bg-[#191c22] border-r-4 border-[#00f2ff]" href="account-manager.html">
+                <span class="material-symbols-outlined">manage_accounts</span> Account Manager
+            </a>
+        </div>
+    </nav>
+
+    <main class="flex-1 relative overflow-y-auto bg-[#10131a] p-8">
+        <div class="max-w-6xl mx-auto relative z-10">
+            <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 border-b border-[#3a494b]/20 pb-6">
+                <div>
+                    <h2 class="font-headline text-3xl font-bold text-white tracking-tight mb-2">SMTP Node Manager</h2>
+                    <p class="text-[#b9cacb] text-sm">Monitor rotation limits and configure dispatch engines.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                
+                <div class="rounded-xl bg-[#32353c]/40 border border-[#3a494b]/30 p-6 shadow-xl relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1 h-full bg-[#00f2ff]"></div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded bg-[#272a31] flex items-center justify-center text-[#00f2ff]">
+                                <span class="material-symbols-outlined">mail</span>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-white text-sm">archishman@keplercodes.com</h3>
+                                <p class="text-xs text-[#b9cacb]">smtp.gmail.com:465</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <div class="flex justify-between text-xs mb-2">
+                            <span class="text-[#b9cacb] font-medium uppercase tracking-wider">Daily Limit</span>
+                            <span class="text-[#00f2ff] font-bold">12 / 50</span>
+                        </div>
+                        <div class="w-full bg-[#191c22] rounded-full h-2">
+                            <div class="bg-[#00f2ff] h-2 rounded-full shadow-[0_0_10px_#00f2ff80]" style="width: 24%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border-2 border-dashed border-[#3a494b]/50 hover:border-[#00f2ff]/50 bg-[#191c22]/30 p-6 flex flex-col items-center justify-center min-h-[200px] cursor-pointer transition-all hover:bg-[#191c22]/60 group" onclick="alert('API Hook required to trigger Add Connection Modal.')">
+                    <div class="w-14 h-14 rounded-full bg-[#272a31] flex items-center justify-center text-[#b9cacb] group-hover:text-[#00f2ff] group-hover:scale-110 transition-all duration-300 mb-3">
+                        <span class="material-symbols-outlined text-3xl">add</span>
+                    </div>
+                    <h3 class="font-bold text-[#e1e2eb] group-hover:text-white">Deploy New Node</h3>
+                    <p class="text-xs text-[#b9cacb] mt-1 text-center">Add a new Gmail App Password</p>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
