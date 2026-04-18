@@ -7,6 +7,29 @@
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function enforceSecurity() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.replace('auth.html'); 
+            } else {
+                window.CURRENT_USER_ID = session.user.id;
+            }
+        }
+        enforceSecurity();
+
+        async function logout() {
+            await supabase.auth.signOut();
+            window.location.replace('auth.html');
+        }
+    </script>
+
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -50,9 +73,14 @@
             <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#00f2ff] bg-[#191c22] border-r-4 border-[#00f2ff]" href="index.html">
                 <span class="material-symbols-outlined">send</span> Dispatch
             </a>
-            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#b9cacb] hover:bg-[#191c22] hover:text-[#e1e2eb]" href="account-manager.html">
+            <a class="flex items-center gap-3 px-3 py-3 rounded-lg text-[#b9cacb] hover:bg-[#191c22] hover:text-[#e1e2eb] transition-colors" href="account-manager.html">
                 <span class="material-symbols-outlined">manage_accounts</span> Account Manager
             </a>
+        </div>
+        <div class="px-3 mt-auto pt-6 border-t border-[#3a494b]/20">
+            <button onclick="logout()" class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-[#ffb4ab] hover:bg-[#191c22] transition-colors text-left">
+                <span class="material-symbols-outlined">logout</span> Terminate Session
+            </button>
         </div>
     </nav>
 
@@ -102,7 +130,7 @@
                     </div>
                 </div>
 
-                <input type="hidden" id="smtpAccountId" value="hardcoded_test_uuid_for_now">
+                <input type="hidden" id="smtpAccountId" value="test_smtp_uuid_here">
 
                 <button type="submit" class="w-full mt-6 rounded-full bg-gradient-to-r from-primary-container to-[#74f5ff] text-on-primary-container py-4 font-bold tracking-widest uppercase hover:shadow-[0_0_20px_#00f2ff4d] transition-shadow flex justify-center items-center gap-2">
                     <span class="material-symbols-outlined">rocket_launch</span> Dispatch Application
@@ -112,7 +140,7 @@
     </main>
 
     <script>
-        // Use the Codespace forwarded URL here once Flask is running
+        // Update this URL if Codespaces changes your forwarded port address
         const API_BASE_URL = 'http://127.0.0.1:5000'; 
 
         async function parseBio() {
@@ -146,10 +174,10 @@
             formData.append('company', document.getElementById('company').value);
             formData.append('role', document.getElementById('role').value);
             formData.append('template_type', document.getElementById('templateType').value);
-            formData.append('user_name', 'Archishman Das'); // Set your actual name here
+            formData.append('user_name', 'Archishman Das'); 
             
-            // To test, bypass Supabase initially or ensure your DB has this dummy data
-            formData.append('user_id', 'dummy_user_uuid');
+            // SECURITY: Uses the actual authenticated User ID
+            formData.append('user_id', window.CURRENT_USER_ID);
             formData.append('smtp_config_id', document.getElementById('smtpAccountId').value); 
 
             const fileInput = document.getElementById('resumePdf');
