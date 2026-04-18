@@ -1,0 +1,54 @@
+<script>
+    // Your exact credentials
+    const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+    
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Check if user is already logged in
+    async function checkSession() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            window.location.href = 'index.html'; // Redirect to dashboard
+        }
+    }
+    checkSession();
+
+    function showError(message) {
+        const errEl = document.getElementById('errorMsg');
+        errEl.textContent = message;
+        errEl.classList.remove('hidden');
+    }
+
+    async function handleSignup() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+        });
+
+        if (error) {
+            showError(error.message);
+        } else {
+            alert("Identity deployed! Check your email to confirm, or login directly if auto-confirm is enabled in Supabase.");
+        }
+    }
+
+    async function handleLogin() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password,
+        });
+
+        if (error) {
+            showError(error.message);
+        } else {
+            window.location.href = 'index.html'; // Success! Go to dashboard
+        }
+    }
+</script>
