@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/scheduled/run",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "builds": [
     {
       "src": "app.py",
