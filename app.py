@@ -374,6 +374,18 @@ def send_email():
     send_at = request.form.get('send_at', '').strip()
     if send_at:
         try:
+            # Upload PDF to Supabase storage so cron can attach it later
+            resume_path = None
+            if pdf_file:
+                import uuid as _uuid
+                pdf_bytes_sched = pdf_file.read()
+                resume_path = f"scheduled/{user_id}/{_uuid.uuid4().hex}_{pdf_file.filename}"
+                supabase.storage.from_('resumes').upload(
+                    resume_path,
+                    pdf_bytes_sched,
+                    {"content-type": "application/pdf", "upsert": "true"}
+                )
+
             supabase.table('scheduled_jobs').insert({
                 "user_id":      user_id,
                 "account_id":   account_id,
@@ -386,7 +398,8 @@ def send_email():
                 "subject":      custom_subject,
                 "body":         custom_body,
                 "send_at":      send_at,
-                "status":       "pending"
+                "status":       "pending",
+                "resume_path":  resume_path
             }).execute()
             return jsonify({"status": "scheduled", "message": f"Email scheduled for {send_at}."})
         except Exception:
@@ -661,9 +674,24 @@ def run_scheduled():
                 subj = subj or fs.format(**target_data)
                 body = body or fb.format(**target_data)
 
+            # Fetch PDF from Supabase storage if one was attached at schedule time
+            sched_pdf_bytes, sched_pdf_name = None, None
+            if job.get('resume_path'):
+                try:
+                    pdf_response = supabase.storage.from_('resumes').download(job['resume_path'])
+                    sched_pdf_bytes = pdf_response
+                    sched_pdf_name  = job['resume_path'].split('/')[-1]
+                    # Strip the uuid prefix to get original filename
+                    # format: scheduled/{uid}/{uuid}_{original_name}.pdf
+                    parts = sched_pdf_name.split('_', 1)
+                    if len(parts) == 2:
+                        sched_pdf_name = parts[1]
+                except Exception:
+                    app.logger.warning(f"Could not fetch PDF for scheduled job {job['id']}, sending without attachment.")
+
             _send_one(account, job['target_email'], target_data['target_name'],
                       target_data['role'], target_data['company'], target_data['user_name'],
-                      subj, body)
+                      subj, body, sched_pdf_bytes, sched_pdf_name)
 
             supabase.table('smtp_configs').update(
                 {"daily_sent_count": account['daily_sent_count'] + 1}
@@ -681,6 +709,12 @@ def run_scheduled():
             }).execute()
 
             supabase.table('scheduled_jobs').update({"status": "sent"}).eq('id', job['id']).execute()
+            # Clean up the temporary PDF from storage
+            if job.get('resume_path'):
+                try:
+                    supabase.storage.from_('resumes').remove([job['resume_path']])
+                except Exception:
+                    pass  # non-critical, just a cleanup
             sent += 1
 
         except Exception:
