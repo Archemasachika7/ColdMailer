@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=00f2ff&height=200&section=header&text=The%20Architect&fontSize=60&fontColor=ffffff&fontAlignY=38&desc=Cold%20Email%20Automation%20Built%20Different&descAlignY=60&descSize=18&animation=fadeIn" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=00f2ff&height=200&section=header&text=Coldmailer&fontSize=60&fontColor=ffffff&fontAlignY=38&desc=Cold%20Email%20Automation%20Built%20Different&descAlignY=60&descSize=18&animation=fadeIn" width="100%"/>
 
 <br/>
 
@@ -16,7 +16,7 @@
 
 ## What is this?
 
-The Architect is a cold email automation tool I built for myself — and now it's fully productised. No GPT, no AI writing, no subscription fees. Just a fast, encrypted dispatch engine that sends your emails, with your words, attached with your CV, on your schedule.
+Coldmailer is a cold email automation tool I built for myself — and now it's fully productised. No GPT, no AI writing, no subscription fees. Just a fast, encrypted dispatch engine that sends your emails, with your words, attached with your CV, on your schedule.
 
 Upload a CSV of contacts. Parse a LinkedIn bio. Write your template once. Hit send to 50 people in a single click. That's it.
 
@@ -68,6 +68,20 @@ Upload a CSV of contacts. Parse a LinkedIn bio. Write your template once. Hit se
 Three template modes — **Industry** (job applications), **Research** (professor outreach), **Custom** (anything else). Every template supports `{target_name}`, `{role}`, `{company}`, `{user_name}` placeholders, replaced automatically per recipient on send.
 
 The file parser accepts CSV, TXT, and DOCX. For CSVs it detects column headers automatically — your columns can be in any order. Parsed rows load directly into the bulk queue.
+
+---
+
+## Motion & Animations
+
+Coldmailer ships with multiple UI animations across auth and dashboard screens:
+
+- `gridDrift` animated cyber-grid background
+- `scanline` vertical sweep effect on auth screen
+- `fadeUp` auth card entrance
+- `pulse` status/brand indicator glow pulse
+- `spin` loading spinners for async actions
+- `cardIn` account cards staggered entrance animation
+- `modalIn` modal pop-in transition
 
 ---
 
@@ -136,8 +150,8 @@ The Fernet key lives only in your `.env` / Vercel environment variables. Rotate 
 **1. Clone and install**
 
 ```bash
-git clone https://github.com/yourusername/the-architect.git
-cd the-architect
+git clone https://github.com/yourusername/coldmailer.git
+cd coldmailer
 pip install -r requirements.txt
 ```
 
@@ -206,7 +220,7 @@ select cron.schedule('reset-daily-counts', '0 0 * * *', 'update public.smtp_conf
 ## File Structure
 
 ```
-the-architect/
+coldmailer/
 ├── app.py                   Flask backend — all 8 API routes
 ├── auth.html                Login / signup
 ├── index.html               Main send dashboard
