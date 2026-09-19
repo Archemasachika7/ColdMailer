@@ -1302,7 +1302,9 @@ def _cron_authorized():
     if not CRON_SECRET:
         # No secret configured — fail closed rather than silently open.
         return False
-    provided = request.headers.get('X-Cron-Secret') or request.args.get('cron_secret')
+    auth_header = request.headers.get('Authorization', '')
+    bearer = auth_header[len('Bearer '):].strip() if auth_header.startswith('Bearer ') else None
+    provided = request.headers.get('X-Cron-Secret') or request.args.get('cron_secret') or bearer
     return provided == CRON_SECRET
 
 
