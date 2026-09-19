@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from email.utils import make_msgid
-from flask import Flask, request, jsonify, Response, g
+from flask import Flask, request, jsonify, Response, g, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 from cryptography.fernet import Fernet
@@ -1458,6 +1458,28 @@ def _run_due_follow_ups(now_iso):
             supabase.table('follow_ups').update({"status": "failed"}).eq('id', fu['id']).execute()
 
     return sent_count
+
+
+# ---------------------------------------------------------------------------
+# Local-dev-only static file serving. In production, vercel.json routes
+# non-/api paths straight to @vercel/static and this code never runs — but
+# locally `python app.py` previously only ran the API with no way to view
+# the dashboard, so this mirrors that routing for local testing.
+# ---------------------------------------------------------------------------
+_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(_ROOT_DIR, 'index.html')
+
+@app.route('/<path:filename>')
+def serve_static_html(filename):
+    if filename.startswith('api/'):
+        return jsonify({"status": "error", "message": "Not found."}), 404
+    full_path = os.path.join(_ROOT_DIR, filename)
+    if os.path.isfile(full_path):
+        return send_from_directory(_ROOT_DIR, filename)
+    return jsonify({"status": "error", "message": "Not found."}), 404
 
 
 if __name__ == '__main__':
