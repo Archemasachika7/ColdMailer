@@ -114,6 +114,12 @@
       <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> SMTP Nodes</a>
       <a href="history.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">history</span> History</a>
       <a href="profile.html" class="nav-link active"><span class="material-symbols-outlined text-[18px]">person</span> Profile</a>
+      <div class="mono text-[9px] tracking-[0.2em] uppercase px-3 pt-4 pb-1" style="color:rgba(88,166,166,0.5);">Outreach V2</div>
+      <a href="companies.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">domain</span> Companies</a>
+      <a href="contacts.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">contacts</span> Contacts</a>
+      <a href="templates.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">description</span> Templates</a>
+      <a href="campaigns.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">campaign</span> Campaigns</a>
+      <a href="assets.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">folder_open</span> Assets</a>
       <a href="https://easy-resume.vercel.app/dashboard" class="nav-link" target="_blank" rel="noopener noreferrer"><img src="https://github.com/user-attachments/assets/f4c4c5b7-7b5d-416c-bc31-9ace303e976c" alt="Easy Resume" class="w-[18px] h-[18px] rounded object-cover"> Easy Resume</a>
     </div>
     <div class="px-3 mt-4 pt-4" style="border-top:1px solid var(--border);">
@@ -166,6 +172,16 @@
               <label class="field-label">Email Address</label>
               <input type="email" id="editEmail" disabled/>
             </div>
+          </div>
+
+          <!-- Outreach sender profile — used to fill {{ sender.* }} template variables -->
+          <div class="mono text-[10px] tracking-[0.2em] uppercase mt-6 mb-3" style="color:var(--text-dim);">Outreach Sender Profile</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label class="field-label">University</label><input type="text" id="editUniversity" placeholder="IIT Bombay"/></div>
+            <div><label class="field-label">Degree</label><input type="text" id="editDegree" placeholder="B.Tech Civil Engineering"/></div>
+            <div><label class="field-label">Graduation Year</label><input type="text" id="editGradYear" placeholder="2028"/></div>
+            <div><label class="field-label">Portfolio URL</label><input type="text" id="editPortfolio" placeholder="https://yourportfolio.com"/></div>
+            <div class="sm:col-span-2"><label class="field-label">LinkedIn URL</label><input type="text" id="editLinkedin" placeholder="https://linkedin.com/in/you"/></div>
           </div>
 
           <div class="flex gap-3 mt-6">
@@ -249,6 +265,11 @@
     // Form
     document.getElementById('editName').value=profile?.full_name||'';
     document.getElementById('editEmail').value=userEmail;
+    document.getElementById('editUniversity').value=profile?.university||'';
+    document.getElementById('editDegree').value=profile?.degree||'';
+    document.getElementById('editGradYear').value=profile?.graduation_year||'';
+    document.getElementById('editPortfolio').value=profile?.portfolio_url||'';
+    document.getElementById('editLinkedin').value=profile?.linkedin_url||'';
     document.getElementById('profileNameDisplay').textContent=name;
     document.getElementById('profileEmailDisplay').textContent=userEmail;
     document.getElementById('avatarPlaceholder').textContent=name.slice(0,2).toUpperCase();
@@ -308,7 +329,15 @@
       }
     }
 
-    const update={id:userId,full_name:name,updated_at:new Date().toISOString()};
+    const gradYearRaw=document.getElementById('editGradYear').value.trim();
+    const update={
+      id:userId, full_name:name, updated_at:new Date().toISOString(),
+      university:document.getElementById('editUniversity').value.trim(),
+      degree:document.getElementById('editDegree').value.trim(),
+      graduation_year: gradYearRaw ? parseInt(gradYearRaw,10) : null,
+      portfolio_url:document.getElementById('editPortfolio').value.trim(),
+      linkedin_url:document.getElementById('editLinkedin').value.trim(),
+    };
     if(avatarUrl) update.avatar_url=avatarUrl;
 
     const{error}=await sb.from('profiles').upsert(update);

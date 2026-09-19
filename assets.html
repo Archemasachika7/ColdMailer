@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Assets — Coldmailer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --cyan:#00f2ff; --cyan-dim:rgba(0,242,255,0.08); --bg:#080b10; --surface:#0d1117; --border:rgba(0,242,255,0.1); --border-mid:rgba(0,242,255,0.2); --text:#c9d1d9; --text-dim:#58a6a6; --red:#ff4d6d; }
+  * { box-sizing: border-box; }
+  body { font-family:'Manrope',sans-serif; background:var(--bg); }
+  .mono { font-family:'IBM Plex Mono',monospace; } .syne { font-family:'Syne',sans-serif; }
+  nav { background:#060810; border-right:1px solid var(--border); }
+  .nav-link { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:4px; font-size:13px; font-weight:500; color:var(--text-dim); text-decoration:none; position:relative; }
+  .nav-link:hover { background:rgba(0,242,255,0.05); color:var(--text); }
+  .nav-link.active { color:var(--cyan); background:rgba(0,242,255,0.07); }
+  .nav-link.active::after { content:''; position:absolute; right:0; top:20%; bottom:20%; width:2px; background:var(--cyan); border-radius:2px; box-shadow:0 0 8px var(--cyan); }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:4px; }
+  .panel-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  input[type="text"], select { background:#0a0e16 !important; border:1px solid rgba(0,242,255,0.18) !important; border-radius:3px !important; color:#c9d1d9 !important; font-family:'Manrope',sans-serif !important; font-size:13px !important; outline:none !important; width:100%; padding:9px 12px; }
+  .btn-cyan { background:var(--cyan); color:#030912; font-weight:700; font-size:12px; letter-spacing:.08em; padding:9px 18px; border:none; border-radius:3px; cursor:pointer; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; }
+  .btn-cyan:hover { box-shadow:0 0 20px rgba(0,242,255,.35); } .btn-cyan:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-ghost { background:transparent; border:1px solid var(--border-mid); color:var(--text-dim); font-size:11px; font-weight:600; font-family:'IBM Plex Mono',monospace; letter-spacing:.1em; text-transform:uppercase; padding:7px 14px; border-radius:3px; cursor:pointer; }
+  .btn-ghost:hover { border-color:var(--cyan); color:var(--cyan); }
+  .field-label { display:block; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; }
+  #toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border); padding:12px 20px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text); transform:translateY(20px); opacity:0; transition:all .25s; pointer-events:none; max-width:340px; z-index:9999; }
+  #toast.show { transform:translateY(0); opacity:1; } #toast.success { border-left:3px solid var(--cyan); } #toast.error { border-left:3px solid var(--red); color:var(--red); }
+  .asset-card { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:16px; display:flex; flex-direction:column; gap:8px; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:var(--surface); border:1px solid var(--border-mid); border-radius:4px; width:92%; max-width:420px; padding:24px; }
+</style>
+</head>
+<body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
+
+<header class="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[#060810] z-50 fixed w-full top-0">
+  <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"></div><span class="syne font-bold text-white text-sm tracking-widest uppercase">Coldmailer</span></div>
+  <button onclick="document.getElementById('sidebarNav').classList.toggle('-translate-x-full')" class="text-white p-1"><span class="material-symbols-outlined">menu</span></button>
+</header>
+
+<nav id="sidebarNav" class="fixed inset-y-0 left-0 bg-[#060810] md:relative transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col h-full w-60 shrink-0 py-6 z-50 md:z-40 border-r border-[var(--border)] pt-20 md:pt-6">
+  <div class="px-5 mb-8"><div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"></div><span class="syne font-bold text-white text-base tracking-widest uppercase">Coldmailer</span></div></div>
+  <div class="flex-1 px-3 space-y-1 overflow-y-auto">
+    <a href="index.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">rocket_launch</span> Send</a>
+    <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> Email Accounts</a>
+    <a href="history.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">history</span> History</a>
+    <a href="profile.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">person</span> Profile</a>
+    <div class="mono text-[9px] tracking-[0.2em] uppercase px-3 pt-4 pb-1" style="color:rgba(88,166,166,0.5);">Outreach V2</div>
+    <a href="companies.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">domain</span> Companies</a>
+    <a href="contacts.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">contacts</span> Contacts</a>
+    <a href="templates.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">description</span> Templates</a>
+    <a href="campaigns.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">campaign</span> Campaigns</a>
+    <a href="assets.html" class="nav-link active"><span class="material-symbols-outlined text-[18px]">folder_open</span> Assets</a>
+  </div>
+  <div class="px-3 mt-4 pt-4 border-t border-[var(--border)]"><button onclick="logout()" class="nav-link w-full text-left" style="color:var(--red);"><span class="material-symbols-outlined text-[18px]">logout</span> Log out</button></div>
+</nav>
+
+<main class="flex-1 overflow-y-auto pt-20 md:pt-0">
+  <div class="max-w-5xl mx-auto p-6 md:p-10">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="syne text-2xl font-bold text-white">Asset Library</h1>
+        <p class="mono text-[11px] text-[var(--text-dim)] mt-1">Resumes, portfolios, cover letters — reusable across campaigns</p>
+      </div>
+      <button onclick="openModal()" class="btn-cyan"><span class="material-symbols-outlined text-[14px] align-middle">upload</span> Upload Asset</button>
+    </div>
+    <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <h3 class="syne font-bold text-white mb-4">Upload Asset</h3>
+    <div class="space-y-3">
+      <div><label class="field-label">Name *</label><input type="text" id="f_name" placeholder="Civil Engineering Resume"/></div>
+      <div><label class="field-label">Kind</label>
+        <select id="f_kind">
+          <option value="resume">Resume</option>
+          <option value="portfolio">Portfolio</option>
+          <option value="cover_letter">Cover Letter</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div><label class="field-label">File *</label><input type="file" id="f_file"/></div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button onclick="closeModal()" class="btn-ghost flex-1">Cancel</button>
+      <button onclick="uploadAsset()" class="btn-cyan flex-1" id="saveBtn">Upload</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let session = null;
+
+  async function authedFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (session) headers.set('Authorization', `Bearer ${session.access_token}`);
+    return fetch(url, { ...options, headers });
+  }
+  function escHtml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const KIND_ICON = { resume: 'description', portfolio: 'work', cover_letter: 'mail', other: 'draft' };
+
+  async function loadAssets() {
+    const res = await authedFetch('/api/assets');
+    const d = await res.json();
+    const assets = d.assets || [];
+    document.getElementById('grid').innerHTML = assets.map(a => `
+      <div class="asset-card">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[var(--cyan)]">${KIND_ICON[a.kind] || 'draft'}</span>
+          <span class="text-white font-medium text-sm truncate">${escHtml(a.name)}</span>
+        </div>
+        <div class="mono text-[10px] text-[var(--text-dim)] truncate">${escHtml(a.file_name)}</div>
+        <div class="mono text-[10px] uppercase tracking-wide" style="color:var(--text-dim);">${escHtml(a.kind)}</div>
+        <button onclick="deleteAsset('${a.id}')" class="btn-ghost mt-2" style="color:var(--red);border-color:rgba(255,77,109,.3);">Delete</button>
+      </div>`).join('') || `<div class="mono text-[12px] text-[var(--text-dim)] col-span-full text-center py-10">No assets yet — upload a resume or portfolio to get started.</div>`;
+  }
+
+  function openModal() { document.getElementById('modal').classList.add('open'); }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    document.getElementById('f_name').value = '';
+    document.getElementById('f_file').value = '';
+  }
+
+  async function uploadAsset() {
+    const name = document.getElementById('f_name').value.trim();
+    const file = document.getElementById('f_file').files[0];
+    if (!name || !file) { showToast('Name and file are required.', 'error'); return; }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('name', name);
+      fd.append('kind', document.getElementById('f_kind').value);
+      fd.append('file', file);
+      const res = await authedFetch('/api/assets', { method: 'POST', body: fd });
+      const d = await res.json();
+      if (d.status === 'ok') { showToast('Asset uploaded.', 'success'); closeModal(); await loadAssets(); }
+      else showToast(d.message || 'Upload failed.', 'error');
+    } finally { btn.disabled = false; }
+  }
+
+  async function deleteAsset(id) {
+    if (!confirm('Delete this asset?')) return;
+    await authedFetch(`/api/assets/${id}`, { method: 'DELETE' });
+    await loadAssets();
+  }
+
+  async function logout() { await sb.auth.signOut(); window.location.replace('auth.html'); }
+
+  let toastTimer;
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `show ${type}`;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', 4000);
+  }
+
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    session = data.session;
+    if (!session) { window.location.replace('auth.html'); return; }
+    await loadAssets();
+  })();
+</script>
+</body>
+</html>

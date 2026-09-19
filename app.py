@@ -974,8 +974,16 @@ def templates_block_registry():
 # ---------------------------------------------------------------------------
 # Variable resolution + preview
 # ---------------------------------------------------------------------------
+PLACEHOLDER_RECIPIENT = {"first_name": "[First Name]", "full_name": "[Full Name]", "role": "[Role]", "email": ""}
+PLACEHOLDER_COMPANY   = {"name": "[Company]", "industry": "[Industry]", "website": ""}
+PLACEHOLDER_SENDER    = {"name": "[Your Name]", "university": "[Your University]", "degree": "[Your Degree]",
+                          "graduation_year": "[Year]", "portfolio": "", "linkedin": ""}
+
+
 def _resolve_context(user_id, contact_id, company_id_override, sender_overrides, campaign_vars, custom_vars):
-    recipient, company, sender = {}, {}, {}
+    """Falls back to bracketed placeholders (never StrictUndefined errors) so
+    a template can be previewed instantly before any contact/profile exists."""
+    recipient, company, sender = dict(PLACEHOLDER_RECIPIENT), dict(PLACEHOLDER_COMPANY), dict(PLACEHOLDER_SENDER)
 
     if contact_id:
         c_rows = supabase.table('contacts').select('*').eq('id', contact_id).eq('user_id', user_id).execute().data

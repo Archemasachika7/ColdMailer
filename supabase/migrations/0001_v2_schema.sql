@@ -75,9 +75,18 @@ create table if not exists public.profiles (
     graduation_year         int,
     portfolio_url           text default '',
     linkedin_url            text default '',
-    avatar_path             text,
+    avatar_url              text,
+    updated_at              timestamptz,
     created_at              timestamptz not null default now()
 );
+
+-- If profiles already existed from V1 without these columns, add them.
+alter table public.profiles
+    add column if not exists university       text default '',
+    add column if not exists degree           text default '',
+    add column if not exists graduation_year  int,
+    add column if not exists portfolio_url    text default '',
+    add column if not exists linkedin_url     text default '';
 
 -- ----------------------------------------------------------------------------
 -- 2. New columns on baseline tables
