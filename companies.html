@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Companies — Coldmailer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --cyan:#00f2ff; --cyan-dim:rgba(0,242,255,0.08); --bg:#080b10; --surface:#0d1117; --surface2:#111720; --border:rgba(0,242,255,0.1); --border-mid:rgba(0,242,255,0.2); --text:#c9d1d9; --text-dim:#58a6a6; --red:#ff4d6d; }
+  * { box-sizing: border-box; }
+  body { font-family:'Manrope',sans-serif; background:var(--bg); }
+  .mono { font-family:'IBM Plex Mono',monospace; }
+  .syne { font-family:'Syne',sans-serif; }
+  nav { background:#060810; border-right:1px solid var(--border); }
+  .nav-link { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:4px; font-size:13px; font-weight:500; color:var(--text-dim); text-decoration:none; transition:all .15s; position:relative; }
+  .nav-link:hover { background:rgba(0,242,255,0.05); color:var(--text); }
+  .nav-link.active { color:var(--cyan); background:rgba(0,242,255,0.07); }
+  .nav-link.active::after { content:''; position:absolute; right:0; top:20%; bottom:20%; width:2px; background:var(--cyan); border-radius:2px; box-shadow:0 0 8px var(--cyan); }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:4px; }
+  .panel-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  textarea, input[type="text"], input[type="email"], input[type="password"], select {
+    background:#0a0e16 !important; border:1px solid rgba(0,242,255,0.18) !important; border-radius:3px !important;
+    color:#c9d1d9 !important; font-family:'Manrope',sans-serif !important; font-size:13px !important; outline:none !important;
+    width:100%; padding:9px 12px;
+  }
+  textarea:focus, input:focus, select:focus { border-color:rgba(0,242,255,0.5) !important; box-shadow:0 0 0 3px rgba(0,242,255,0.07) !important; }
+  .btn-cyan { background:var(--cyan); color:#030912; font-weight:700; font-size:12px; letter-spacing:.08em; padding:9px 18px; border:none; border-radius:3px; cursor:pointer; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; }
+  .btn-cyan:hover { box-shadow:0 0 20px rgba(0,242,255,.35); }
+  .btn-cyan:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-ghost { background:transparent; border:1px solid var(--border-mid); color:var(--text-dim); font-size:11px; font-weight:600; font-family:'IBM Plex Mono',monospace; letter-spacing:.1em; text-transform:uppercase; padding:7px 14px; border-radius:3px; cursor:pointer; }
+  .btn-ghost:hover { border-color:var(--cyan); color:var(--cyan); }
+  .field-label { display:block; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; }
+  #toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border-mid); padding:12px 20px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text); transform:translateY(16px) scale(.97); opacity:0; transition:all .3s cubic-bezier(.2,.9,.3,1); pointer-events:none; max-width:340px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  #toast.show { transform:translateY(0) scale(1); opacity:1; }
+  #toast.success { border-left:3px solid var(--cyan); }
+  #toast.error { border-left:3px solid var(--red); color:var(--red); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); padding:10px 16px; border-bottom:1px solid var(--border); }
+  td { padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:top; }
+  tr:hover td { background:rgba(0,242,255,0.02); }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); backdrop-filter:blur(2px); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:var(--surface); border:1px solid var(--border-mid); border-radius:4px; width:92%; max-width:480px; padding:24px; animation: modalPop .22s cubic-bezier(.2,.9,.3,1); }
+
+  /* ── Motion & atmosphere ───────────────────────────────────── */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: linear-gradient(rgba(0,242,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,255,0.025) 1px, transparent 1px);
+    background-size:48px 48px; animation: gridDrift 30s linear infinite;
+  }
+  @keyframes gridDrift { 0%{background-position:0 0;} 100%{background-position:48px 96px;} }
+  body::after {
+    content:''; position:fixed; top:-2px; left:0; width:100%; height:2px; pointer-events:none; z-index:0;
+    background:linear-gradient(90deg, transparent, var(--cyan), transparent); opacity:.3; animation: scanline 8s linear infinite;
+  }
+  @keyframes scanline { 0%{top:-2px;} 100%{top:100%;} }
+  @keyframes fadeUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  .page-enter { animation: fadeUp .45s ease forwards; }
+  @keyframes cardIn { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .stagger { opacity:0; animation: cardIn .4s ease forwards; }
+  @keyframes modalPop { from{opacity:0; transform:scale(.94) translateY(6px);} to{opacity:1; transform:scale(1) translateY(0);} }
+  @keyframes shimmer { 0%{background-position:-300px 0;} 100%{background-position:300px 0;} }
+  .skeleton { background:linear-gradient(90deg, rgba(255,255,255,0.015) 25%, rgba(0,242,255,0.05) 37%, rgba(255,255,255,0.015) 63%); background-size:600px 100%; animation:shimmer 1.3s infinite linear; border-radius:3px; display:inline-block; }
+  .btn-cyan, .btn-ghost { transition: transform .15s ease, box-shadow .2s ease, border-color .15s ease, color .15s ease, background .15s ease; }
+  .btn-cyan:hover { transform: translateY(-1px); } .btn-cyan:active { transform: scale(.96); } .btn-ghost:active { transform: scale(.96); }
+  .panel, tr { transition: background .18s ease, border-color .18s ease, box-shadow .18s ease; }
+  .panel:hover { border-color: var(--border-mid); }
+  nav, main, .modal-overlay, #toast { position:relative; z-index:1; }
+</style>
+</head>
+<body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
+
+<header class="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[#060810] z-50 fixed w-full top-0">
+  <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"></div><span class="syne font-bold text-white text-sm tracking-widest uppercase">Coldmailer</span></div>
+  <button onclick="document.getElementById('sidebarNav').classList.toggle('-translate-x-full')" class="text-white p-1"><span class="material-symbols-outlined">menu</span></button>
+</header>
+
+<nav id="sidebarNav" class="fixed inset-y-0 left-0 bg-[#060810] md:relative transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col h-full w-60 shrink-0 py-6 z-50 md:z-40 border-r border-[var(--border)] pt-20 md:pt-6">
+  <div class="px-5 mb-8">
+    <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"></div><span class="syne font-bold text-white text-base tracking-widest uppercase">Coldmailer</span></div>
+  </div>
+  <div class="flex-1 px-3 space-y-1 overflow-y-auto">
+    <a href="index.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">rocket_launch</span> Send</a>
+    <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> Email Accounts</a>
+    <a href="history.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">history</span> History</a>
+    <a href="profile.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">person</span> Profile</a>
+    <div class="mono text-[9px] tracking-[0.2em] uppercase px-3 pt-4 pb-1" style="color:rgba(88,166,166,0.5);">Outreach V2</div>
+    <a href="companies.html" class="nav-link active"><span class="material-symbols-outlined text-[18px]">domain</span> Companies</a>
+    <a href="contacts.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">contacts</span> Contacts</a>
+    <a href="templates.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">description</span> Templates</a>
+    <a href="campaigns.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">campaign</span> Campaigns</a>
+    <a href="assets.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">folder_open</span> Assets</a>
+  </div>
+  <div class="px-3 mt-4 pt-4 border-t border-[var(--border)]">
+    <button onclick="logout()" class="nav-link w-full text-left" style="color:var(--red);"><span class="material-symbols-outlined text-[18px]">logout</span> Log out</button>
+  </div>
+</nav>
+
+<main class="flex-1 overflow-y-auto pt-20 md:pt-0">
+  <div class="max-w-5xl mx-auto p-6 md:p-10 page-enter">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="syne text-2xl font-bold text-white">Companies</h1>
+        <p class="mono text-[11px] text-[var(--text-dim)] mt-1">Reusable company records — hiring areas, industry, notes</p>
+      </div>
+      <button onclick="openModal()" class="btn-cyan"><span class="material-symbols-outlined text-[14px] align-middle">add</span> New Company</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><span class="mono text-[11px] text-[var(--text-dim)]" id="countLabel">Loading...</span></div>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>Name</th><th>Industry</th><th>Location</th><th>Hiring Areas</th><th>Website</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <h3 class="syne font-bold text-white mb-4">New Company</h3>
+    <div class="space-y-3">
+      <div><label class="field-label">Name *</label><input type="text" id="f_name" placeholder="WSP"/></div>
+      <div><label class="field-label">Industry</label><input type="text" id="f_industry" placeholder="Structural Engineering"/></div>
+      <div><label class="field-label">Website</label><input type="text" id="f_website" placeholder="wsp.com"/></div>
+      <div><label class="field-label">Location</label><input type="text" id="f_location" placeholder="Mumbai, India"/></div>
+      <div><label class="field-label">Hiring Areas (comma separated)</label><input type="text" id="f_hiring" placeholder="Structural Engineering, BIM"/></div>
+      <div><label class="field-label">Notes</label><textarea id="f_notes" rows="2"></textarea></div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button onclick="closeModal()" class="btn-ghost flex-1">Cancel</button>
+      <button onclick="saveCompany()" class="btn-cyan flex-1" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let session = null;
+  let companies = [];
+
+  async function authedFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (session) headers.set('Authorization', `Bearer ${session.access_token}`);
+    return fetch(url, { ...options, headers });
+  }
+
+  function escHtml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function skeletonRows(n, cols) {
+    return Array.from({ length: n }).map(() => `<tr class="skeleton-row">${'<td><span class="skeleton" style="width:80%;height:12px;"></span></td>'.repeat(cols)}</tr>`).join('');
+  }
+
+  async function loadCompanies() {
+    document.getElementById('rows').innerHTML = skeletonRows(4, 6);
+    const res = await authedFetch('/api/companies');
+    const d = await res.json();
+    companies = d.companies || [];
+    document.getElementById('countLabel').textContent = `${companies.length} companies`;
+    document.getElementById('rows').innerHTML = companies.map((c, i) => `
+      <tr class="stagger" style="animation-delay:${Math.min(i*40,400)}ms">
+        <td class="text-white font-medium">${escHtml(c.name)}</td>
+        <td class="mono text-[12px] text-[var(--text-dim)]">${escHtml(c.industry)}</td>
+        <td class="mono text-[12px] text-[var(--text-dim)]">${escHtml(c.location)}</td>
+        <td class="mono text-[11px] text-[var(--text-dim)]">${(c.hiring_areas||[]).join(', ')}</td>
+        <td class="mono text-[11px] text-[var(--text-dim)]">${escHtml(c.website)}</td>
+        <td><button onclick="deleteCompany('${c.id}')" class="btn-ghost" style="color:var(--red);border-color:rgba(255,77,109,.3);">Delete</button></td>
+      </tr>`).join('') || `<tr><td colspan="6" class="text-center mono text-[12px] text-[var(--text-dim)] py-8">No companies yet — add one to get started.</td></tr>`;
+  }
+
+  function openModal() { document.getElementById('modal').classList.add('open'); }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    ['f_name','f_industry','f_website','f_location','f_hiring','f_notes'].forEach(id => document.getElementById(id).value = '');
+  }
+
+  async function saveCompany() {
+    const name = document.getElementById('f_name').value.trim();
+    if (!name) { showToast('Name is required.', 'error'); return; }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    try {
+      const res = await authedFetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          industry: document.getElementById('f_industry').value.trim(),
+          website: document.getElementById('f_website').value.trim(),
+          location: document.getElementById('f_location').value.trim(),
+          hiring_areas: document.getElementById('f_hiring').value.split(',').map(s => s.trim()).filter(Boolean),
+          notes: document.getElementById('f_notes').value.trim(),
+        })
+      });
+      const d = await res.json();
+      if (d.status === 'ok') {
+        showToast('Company saved.', 'success');
+        closeModal();
+        await loadCompanies();
+      } else {
+        showToast(d.message || 'Save failed.', 'error');
+      }
+    } finally { btn.disabled = false; }
+  }
+
+  async function deleteCompany(id) {
+    if (!confirm('Delete this company? Contacts linked to it will keep their record but lose the link.')) return;
+    await authedFetch(`/api/companies/${id}`, { method: 'DELETE' });
+    await loadCompanies();
+  }
+
+  async function logout() { await sb.auth.signOut(); window.location.replace('auth.html'); }
+
+  let toastTimer;
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `show ${type}`;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', 4000);
+  }
+
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    session = data.session;
+    if (!session) { window.location.replace('auth.html'); return; }
+    await loadCompanies();
+  })();
+</script>
+</body>
+</html>

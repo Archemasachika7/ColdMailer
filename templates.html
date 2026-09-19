@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Templates — Coldmailer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --cyan:#00f2ff; --cyan-dim:rgba(0,242,255,0.08); --bg:#080b10; --surface:#0d1117; --surface2:#111720; --border:rgba(0,242,255,0.1); --border-mid:rgba(0,242,255,0.2); --text:#c9d1d9; --text-dim:#58a6a6; --red:#ff4d6d; }
+  * { box-sizing: border-box; }
+  body { font-family:'Manrope',sans-serif; background:var(--bg); }
+  .mono { font-family:'IBM Plex Mono',monospace; } .syne { font-family:'Syne',sans-serif; }
+  nav { background:#060810; border-right:1px solid var(--border); }
+  .nav-link { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:4px; font-size:13px; font-weight:500; color:var(--text-dim); text-decoration:none; position:relative; }
+  .nav-link:hover { background:rgba(0,242,255,0.05); color:var(--text); }
+  .nav-link.active { color:var(--cyan); background:rgba(0,242,255,0.07); }
+  .nav-link.active::after { content:''; position:absolute; right:0; top:20%; bottom:20%; width:2px; background:var(--cyan); border-radius:2px; box-shadow:0 0 8px var(--cyan); }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:4px; }
+  .panel-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  textarea, input[type="text"], input[type="number"], select {
+    background:#0a0e16 !important; border:1px solid rgba(0,242,255,0.18) !important; border-radius:3px !important;
+    color:#c9d1d9 !important; font-family:'Manrope',sans-serif !important; font-size:12.5px !important; outline:none !important; width:100%; padding:8px 10px;
+  }
+  textarea:focus, input:focus, select:focus { border-color:rgba(0,242,255,0.5) !important; box-shadow:0 0 0 3px rgba(0,242,255,0.07) !important; }
+  .btn-cyan { background:var(--cyan); color:#030912; font-weight:700; font-size:11px; letter-spacing:.08em; padding:8px 16px; border:none; border-radius:3px; cursor:pointer; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; }
+  .btn-cyan:hover { box-shadow:0 0 20px rgba(0,242,255,.35); } .btn-cyan:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-ghost { background:transparent; border:1px solid var(--border-mid); color:var(--text-dim); font-size:10px; font-weight:600; font-family:'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase; padding:6px 12px; border-radius:3px; cursor:pointer; }
+  .btn-ghost:hover { border-color:var(--cyan); color:var(--cyan); }
+  .btn-ghost.active { color:var(--cyan); border-color:var(--cyan); background:rgba(0,242,255,0.06); }
+  .field-label { display:block; font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; color:var(--text-dim); margin-bottom:5px; }
+  #toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border-mid); padding:12px 20px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text); transform:translateY(16px) scale(.97); opacity:0; transition:all .3s cubic-bezier(.2,.9,.3,1); pointer-events:none; max-width:340px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  #toast.show { transform:translateY(0) scale(1); opacity:1; } #toast.success { border-left:3px solid var(--cyan); } #toast.error { border-left:3px solid var(--red); color:var(--red); }
+
+  .block-row { border:1px solid var(--border); border-radius:4px; margin-bottom:8px; overflow:hidden; }
+  .block-head { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--surface2); }
+  .block-head.disabled { opacity:.5; }
+  .block-body { padding:10px 12px; }
+  .switch { position:relative; width:34px; height:18px; background:#1a2530; border-radius:10px; cursor:pointer; transition:.2s; flex-shrink:0; }
+  .switch.on { background:var(--cyan); }
+  .switch::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:.2s; }
+  .switch.on::after { transform:translateX(16px); }
+
+  .varchip { display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:10px; padding:4px 8px; margin:2px; border-radius:3px; background:rgba(0,242,255,0.06); border:1px solid var(--border); color:var(--cyan); cursor:pointer; }
+  .varchip:hover { background:rgba(0,242,255,0.14); }
+
+  .preview-tabs { display:flex; gap:4px; }
+  .preview-tab { font-family:'IBM Plex Mono',monospace; font-size:10px; padding:6px 12px; border-radius:3px; cursor:pointer; color:var(--text-dim); border:1px solid transparent; }
+  .preview-tab.active { color:var(--cyan); border-color:var(--border-mid); background:rgba(0,242,255,0.06); }
+
+  .preview-frame-desktop { width:100%; max-width:560px; margin:0 auto; background:#fff; border-radius:4px; overflow:hidden; }
+  .preview-frame-mobile { width:100%; max-width:340px; margin:0 auto; background:#fff; border-radius:4px; overflow:hidden; }
+  .preview-plain { background:#0a0e16; border:1px solid var(--border); border-radius:4px; padding:16px; font-family:'IBM Plex Mono',monospace; font-size:12px; white-space:pre-wrap; color:var(--text); }
+
+  select#templateList { max-width:220px; }
+
+  /* ── Motion & atmosphere ───────────────────────────────────── */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: linear-gradient(rgba(0,242,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,255,0.025) 1px, transparent 1px);
+    background-size:48px 48px; animation: gridDrift 30s linear infinite;
+  }
+  @keyframes gridDrift { 0%{background-position:0 0;} 100%{background-position:48px 96px;} }
+  body::after {
+    content:''; position:fixed; top:-2px; left:0; width:100%; height:2px; pointer-events:none; z-index:0;
+    background:linear-gradient(90deg, transparent, var(--cyan), transparent); opacity:.3; animation: scanline 8s linear infinite;
+  }
+  @keyframes scanline { 0%{top:-2px;} 100%{top:100%;} }
+  @keyframes fadeUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  .page-enter { animation: fadeUp .45s ease forwards; }
+  @keyframes cardIn { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+  .stagger { opacity:0; animation: cardIn .35s ease forwards; }
+  @keyframes softFade { from{opacity:.35;} to{opacity:1;} }
+  .preview-refresh { animation: softFade .25s ease; }
+  .btn-cyan, .btn-ghost { transition: transform .15s ease, box-shadow .2s ease, border-color .15s ease, color .15s ease, background .15s ease; }
+  .btn-cyan:hover { transform: translateY(-1px); } .btn-cyan:active { transform: scale(.96); } .btn-ghost:active { transform: scale(.96); }
+  .block-row { transition: border-color .2s ease, box-shadow .2s ease; }
+  .block-row:hover { border-color: var(--border-mid); }
+  .varchip { transition: transform .12s ease, background .15s ease; }
+  .varchip:active { transform: scale(.93); }
+  .switch { transition: background .2s ease; }
+  .switch::after { transition: transform .2s cubic-bezier(.34,1.56,.64,1); }
+  nav, main, .modal-overlay, #toast { position:relative; z-index:1; }
+</style>
+</head>
+<body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
+
+<header class="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[#060810] z-50 fixed w-full top-0">
+  <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"></div><span class="syne font-bold text-white text-sm tracking-widest uppercase">Coldmailer</span></div>
+  <button onclick="document.getElementById('sidebarNav').classList.toggle('-translate-x-full')" class="text-white p-1"><span class="material-symbols-outlined">menu</span></button>
+</header>
+
+<nav id="sidebarNav" class="fixed inset-y-0 left-0 bg-[#060810] md:relative transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col h-full w-60 shrink-0 py-6 z-50 md:z-40 border-r border-[var(--border)] pt-20 md:pt-6">
+  <div class="px-5 mb-8"><div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"></div><span class="syne font-bold text-white text-base tracking-widest uppercase">Coldmailer</span></div></div>
+  <div class="flex-1 px-3 space-y-1 overflow-y-auto">
+    <a href="index.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">rocket_launch</span> Send</a>
+    <a href="account-manager.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">manage_accounts</span> Email Accounts</a>
+    <a href="history.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">history</span> History</a>
+    <a href="profile.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">person</span> Profile</a>
+    <div class="mono text-[9px] tracking-[0.2em] uppercase px-3 pt-4 pb-1" style="color:rgba(88,166,166,0.5);">Outreach V2</div>
+    <a href="companies.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">domain</span> Companies</a>
+    <a href="contacts.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">contacts</span> Contacts</a>
+    <a href="templates.html" class="nav-link active"><span class="material-symbols-outlined text-[18px]">description</span> Templates</a>
+    <a href="campaigns.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">campaign</span> Campaigns</a>
+    <a href="assets.html" class="nav-link"><span class="material-symbols-outlined text-[18px]">folder_open</span> Assets</a>
+  </div>
+  <div class="px-3 mt-4 pt-4 border-t border-[var(--border)]"><button onclick="logout()" class="nav-link w-full text-left" style="color:var(--red);"><span class="material-symbols-outlined text-[18px]">logout</span> Log out</button></div>
+</nav>
+
+<main class="flex-1 overflow-y-auto pt-20 md:pt-0">
+  <div class="max-w-[1400px] mx-auto p-4 md:p-6 page-enter">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div>
+        <h1 class="syne text-2xl font-bold text-white">Templates</h1>
+        <p class="mono text-[11px] text-[var(--text-dim)] mt-1">Block-based, enable/disable per campaign type, with live preview</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="templateList" onchange="loadSelectedTemplate()"><option value="">— New Template —</option></select>
+        <button onclick="newTemplate()" class="btn-ghost">New</button>
+        <button onclick="saveTemplate()" class="btn-cyan" id="saveBtn">Save Template</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- LEFT: editor -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="mono text-[11px] text-white font-semibold">Editor</span>
+        </div>
+        <div class="p-4 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="field-label">Template Name</label><input type="text" id="t_name" placeholder="2027 Structural Internship"/></div>
+            <div>
+              <label class="field-label">Campaign Type (block preset)</label>
+              <select id="t_campaign_type" onchange="applyPreset()">
+                <option value="internship_2027">Internship (2027-style)</option>
+                <option value="graduate_2028">Graduate / Placement</option>
+                <option value="recruiter_networking">Recruiter Networking</option>
+                <option value="campus_outreach">Campus / Institutional Outreach</option>
+                <option value="custom">Custom (all blocks on)</option>
+              </select>
+            </div>
+          </div>
+          <div><label class="field-label">Subject Line</label><input type="text" id="t_subject" placeholder="{{ campaign.internship_year }} Internship Interest — {{ company.name }}"/></div>
+
+          <div>
+            <label class="field-label">Insert Variable (click, then click into a block field)</label>
+            <div id="varPicker"></div>
+          </div>
+
+          <div class="pt-2">
+            <label class="field-label">Blocks — toggle on/off, edit content</label>
+            <div id="blocksContainer"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: preview -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="mono text-[11px] text-white font-semibold">Live Preview</span>
+          <div class="preview-tabs">
+            <div class="preview-tab active" data-tab="desktop" onclick="switchPreviewTab('desktop')">Desktop</div>
+            <div class="preview-tab" data-tab="mobile" onclick="switchPreviewTab('mobile')">Mobile</div>
+            <div class="preview-tab" data-tab="plain" onclick="switchPreviewTab('plain')">Plain Text</div>
+          </div>
+        </div>
+        <div class="p-4 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="field-label">Preview against contact</label><select id="p_contact" onchange="refreshPreview()"><option value="">— sample data —</option></select></div>
+            <div><label class="field-label">Campaign years</label>
+              <div class="flex gap-2">
+                <input type="number" id="p_internship_year" placeholder="Intern yr" value="2027" oninput="refreshPreview()"/>
+                <input type="number" id="p_placement_year" placeholder="Grad yr" value="2028" oninput="refreshPreview()"/>
+              </div>
+            </div>
+          </div>
+          <div><label class="field-label">Custom variables (JSON, e.g. {"hiring_interest":"Structural Engineering"})</label><input type="text" id="p_custom" placeholder='{"hiring_interest":"Structural Engineering"}' oninput="refreshPreview()"/></div>
+
+          <div id="previewError" class="hidden mono text-[11px] p-3 rounded" style="background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.3); color:var(--red);"></div>
+
+          <div class="mono text-[11px] text-[var(--text-dim)] mb-1">Subject: <span id="previewSubject" class="text-white"></span></div>
+
+          <div id="previewDesktop" class="preview-frame-desktop"><div id="previewHtmlDesktop" style="min-height:200px;"></div></div>
+          <div id="previewMobile" class="preview-frame-mobile hidden"><div id="previewHtmlMobile" style="min-height:200px;"></div></div>
+          <pre id="previewPlain" class="preview-plain hidden"></pre>
+
+          <div class="flex gap-2 pt-2">
+            <select id="testAccount" style="max-width:220px;"></select>
+            <button onclick="sendTest()" class="btn-ghost" id="testBtn">Send Test To Me</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const SUPABASE_URL = 'https://ioqgduqyfdcjvafyytxz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_3zzV6ji9zBp8xWtV_3jfGw_y2AA1Ey7';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let session = null;
+  let currentTemplateId = null;
+  let blockRegistry = [], blockOrder = [], presets = {};
+  let blocksState = []; // [{key, enabled, content}]
+  let previewTab = 'desktop';
+  let previewDebounce = null;
+
+  async function authedFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (session) headers.set('Authorization', `Bearer ${session.access_token}`);
+    return fetch(url, { ...options, headers });
+  }
+  function escHtml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const VARIABLES = [
+    'recipient.first_name','recipient.full_name','recipient.role',
+    'company.name','company.industry','company.website',
+    'sender.name','sender.university','sender.degree','sender.graduation_year','sender.portfolio','sender.linkedin',
+    'campaign.internship_year','campaign.placement_year',
+    'custom.hiring_interest','custom.personal_note',
+  ];
+
+  function renderVarPicker() {
+    document.getElementById('varPicker').innerHTML = VARIABLES.map(v =>
+      `<span class="varchip" onclick="insertVar('${v}')">{{ ${v} }}</span>`
+    ).join('');
+  }
+
+  let lastFocusedField = null;
+  function trackFocus(el) { lastFocusedField = el; }
+  function insertVar(v) {
+    const token = `{{ ${v} }}`;
+    if (lastFocusedField && document.body.contains(lastFocusedField)) {
+      const el = lastFocusedField;
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? el.value.length;
+      el.value = el.value.slice(0, start) + token + el.value.slice(end);
+      el.dispatchEvent(new Event('input'));
+      el.focus();
+      el.selectionStart = el.selectionEnd = start + token.length;
+    } else {
+      showToast('Click into a block or subject field first, then click a variable.', 'error');
+    }
+  }
+
+  async function loadBlockRegistry() {
+    const res = await authedFetch('/api/templates/block-registry');
+    const d = await res.json();
+    blockRegistry = d.blocks; blockOrder = d.order; presets = d.presets;
+  }
+
+  function defaultBlocksFor(campaignType) {
+    const enabledKeys = new Set(presets[campaignType] || presets['custom']);
+    return blockOrder.map(key => ({ key, enabled: enabledKeys.has(key), content: '' }));
+  }
+
+  function applyPreset() {
+    const type = document.getElementById('t_campaign_type').value;
+    blocksState = defaultBlocksFor(type);
+    renderBlocks();
+    refreshPreview();
+  }
+
+  function renderBlocks() {
+    const labelOf = key => (blockRegistry.find(b => b.key === key) || {}).label || key;
+    document.getElementById('blocksContainer').innerHTML = blocksState.map((b, i) => `
+      <div class="block-row stagger" style="animation-delay:${Math.min(i*30,300)}ms">
+        <div class="block-head ${b.enabled ? '' : 'disabled'}">
+          <span class="mono text-[11px] text-white">${escHtml(labelOf(b.key))}</span>
+          <div class="switch ${b.enabled ? 'on' : ''}" onclick="toggleBlock(${i})"></div>
+        </div>
+        <div class="block-body">
+          <textarea rows="2" data-idx="${i}" onfocus="trackFocus(this)" oninput="updateBlockContent(${i}, this.value)" placeholder="Plain text with {{ variables }}...">${escHtml(b.content)}</textarea>
+        </div>
+      </div>`).join('');
+  }
+
+  function toggleBlock(i) { blocksState[i].enabled = !blocksState[i].enabled; renderBlocks(); refreshPreview(); }
+  function updateBlockContent(i, val) { blocksState[i].content = val; scheduleRefreshPreview(); }
+
+  function scheduleRefreshPreview() {
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(refreshPreview, 400);
+  }
+
+  function newTemplate() {
+    currentTemplateId = null;
+    document.getElementById('templateList').value = '';
+    document.getElementById('t_name').value = '';
+    document.getElementById('t_subject').value = '{{ campaign.internship_year }} Internship Interest — {{ company.name }}';
+    document.getElementById('t_campaign_type').value = 'internship_2027';
+    applyPreset();
+  }
+
+  async function loadTemplateList() {
+    const res = await authedFetch('/api/templates');
+    const d = await res.json();
+    const sel = document.getElementById('templateList');
+    sel.innerHTML = '<option value="">— New Template —</option>' +
+      (d.templates || []).map(t => `<option value="${t.id}">${escHtml(t.name)}</option>`).join('');
+  }
+
+  async function loadSelectedTemplate() {
+    const id = document.getElementById('templateList').value;
+    if (!id) { newTemplate(); return; }
+    const res = await authedFetch(`/api/templates/${id}`);
+    const d = await res.json();
+    if (d.status !== 'ok') { showToast('Could not load template.', 'error'); return; }
+    currentTemplateId = id;
+    document.getElementById('t_name').value = d.template.name;
+    document.getElementById('t_subject').value = d.template.subject_template;
+    document.getElementById('t_campaign_type').value = d.template.campaign_type;
+    blocksState = d.template.blocks;
+    renderBlocks();
+    refreshPreview();
+  }
+
+  async function saveTemplate() {
+    const name = document.getElementById('t_name').value.trim();
+    if (!name) { showToast('Template name is required.', 'error'); return; }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    const payload = {
+      name,
+      campaign_type: document.getElementById('t_campaign_type').value,
+      subject_template: document.getElementById('t_subject').value,
+      blocks: blocksState,
+    };
+    try {
+      let res;
+      if (currentTemplateId) {
+        res = await authedFetch(`/api/templates/${currentTemplateId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+      } else {
+        res = await authedFetch('/api/templates', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+      }
+      const d = await res.json();
+      if (d.status === 'ok') {
+        showToast('Template saved.', 'success');
+        if (d.template) currentTemplateId = d.template.id;
+        await loadTemplateList();
+        document.getElementById('templateList').value = currentTemplateId || '';
+      } else {
+        showToast(d.message || 'Save failed.', 'error');
+      }
+    } finally { btn.disabled = false; }
+  }
+
+  async function loadContactsForPreview() {
+    const res = await authedFetch('/api/contacts');
+    const d = await res.json();
+    const sel = document.getElementById('p_contact');
+    sel.innerHTML = '<option value="">— sample data —</option>' +
+      (d.contacts || []).map(c => `<option value="${c.id}">${escHtml(c.full_name || c.email)}</option>`).join('');
+  }
+
+  async function loadAccountsForTest() {
+    const res = await authedFetch('/api/companies'); // warm auth; ignore
+    const accRes = await sb.from('smtp_configs').select('id,email_address').eq('user_id', session.user.id);
+    const sel = document.getElementById('testAccount');
+    sel.innerHTML = (accRes.data || []).map(a => `<option value="${a.id}">${escHtml(a.email_address)}</option>`).join('') || '<option value="">No SMTP account</option>';
+  }
+
+  function switchPreviewTab(tab) {
+    previewTab = tab;
+    document.querySelectorAll('.preview-tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+    document.getElementById('previewDesktop').classList.toggle('hidden', tab !== 'desktop');
+    document.getElementById('previewMobile').classList.toggle('hidden', tab !== 'mobile');
+    document.getElementById('previewPlain').classList.toggle('hidden', tab !== 'plain');
+  }
+
+  async function refreshPreview() {
+    const errEl = document.getElementById('previewError');
+    errEl.classList.add('hidden');
+
+    let customVars = {};
+    const customRaw = document.getElementById('p_custom').value.trim();
+    if (customRaw) {
+      try { customVars = JSON.parse(customRaw); }
+      catch { errEl.textContent = 'Custom variables JSON is invalid.'; errEl.classList.remove('hidden'); return; }
+    }
+
+    const body = {
+      template: {
+        subject_template: document.getElementById('t_subject').value,
+        blocks: blocksState,
+      },
+      contact_id: document.getElementById('p_contact').value || null,
+      campaign: {
+        internship_year: Number(document.getElementById('p_internship_year').value) || undefined,
+        placement_year: Number(document.getElementById('p_placement_year').value) || undefined,
+      },
+      custom: customVars,
+    };
+
+    const res = await authedFetch('/api/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const d = await res.json();
+    if (d.status !== 'ok') {
+      errEl.textContent = d.message || 'Preview failed — check for unknown variables in your blocks.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('previewSubject').textContent = d.subject;
+    document.getElementById('previewHtmlDesktop').innerHTML = `<iframe style="width:100%;height:400px;border:none;" srcdoc="${escHtml(d.html)}"></iframe>`;
+    document.getElementById('previewHtmlMobile').innerHTML = `<iframe style="width:100%;height:500px;border:none;" srcdoc="${escHtml(d.html)}"></iframe>`;
+    document.getElementById('previewPlain').textContent = d.plain_text;
+
+    // Subtle re-fade so repeated edits visibly refresh the preview, not just silently replace it.
+    ['previewHtmlDesktop','previewHtmlMobile','previewPlain'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('preview-refresh');
+      void el.offsetWidth;
+      el.classList.add('preview-refresh');
+    });
+  }
+
+  async function sendTest() {
+    const accountId = document.getElementById('testAccount').value;
+    if (!accountId) { showToast('Add an SMTP account first (Email Accounts page).', 'error'); return; }
+    const btn = document.getElementById('testBtn');
+    btn.disabled = true;
+    try {
+      let customVars = {};
+      try { customVars = JSON.parse(document.getElementById('p_custom').value.trim() || '{}'); } catch {}
+      const res = await authedFetch('/api/send-test', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtp_config_id: accountId,
+          template: { subject_template: document.getElementById('t_subject').value, blocks: blocksState },
+          contact_id: document.getElementById('p_contact').value || null,
+          campaign: {
+            internship_year: Number(document.getElementById('p_internship_year').value) || undefined,
+            placement_year: Number(document.getElementById('p_placement_year').value) || undefined,
+          },
+          custom: customVars,
+        })
+      });
+      const d = await res.json();
+      if (d.status === 'ok') showToast(d.message, 'success');
+      else showToast(d.message || 'Send test failed.', 'error');
+    } finally { btn.disabled = false; }
+  }
+
+  async function logout() { await sb.auth.signOut(); window.location.replace('auth.html'); }
+
+  let toastTimer;
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `show ${type}`;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', 4500);
+  }
+
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    session = data.session;
+    if (!session) { window.location.replace('auth.html'); return; }
+    renderVarPicker();
+    await loadBlockRegistry();
+    await loadTemplateList();
+    await loadContactsForPreview();
+    await loadAccountsForTest();
+    newTemplate();
+  })();
+</script>
+</body>
+</html>
