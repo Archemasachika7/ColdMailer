@@ -366,22 +366,39 @@
     }).join('');
   }
 
-  // ── Scheduled sends: now server-driven, not client-triggered ──────────
-  // /api/scheduled/run requires a CRON_SECRET the browser is never given —
-  // it's called automatically by Vercel Cron every 5 minutes (see
-  // vercel.json), so pending jobs get sent even if this tab (or any tab)
-  // is closed. This button just refreshes the view to show current status
-  // rather than pretending to trigger the send itself.
+  // ── Run scheduled sends manually ──────────────────────────────
   async function runScheduledNow() {
     const btn = document.getElementById('runScheduledBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Refreshing...';
+    btn.innerHTML = '<span class="spinner"></span> Running...';
+
     try {
-      await Promise.all([loadHistory(currentUid), loadPendingJobs(currentUid)]);
-      showToast('Refreshed — pending emails are sent automatically by the server every few minutes.', 'success');
+      const res = await fetch(`${API_BASE_URL}/api/scheduled/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        showToast(`Server error ${res.status}: ${text.slice(0, 120)}`, 'error');
+        return;
+      }
+
+      const d = await res.json();
+      if (d.sent > 0) {
+        showToast(`✓ Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''}.`, 'success');
+        await Promise.all([loadHistory(currentUid), loadPendingJobs(currentUid)]);
+      } else if (d.failed > 0) {
+        const reason = d.errors?.[0]?.reason || 'unknown error';
+        showToast(`Send failed: ${reason}`, 'error');
+      } else {
+        showToast('No pending emails to send right now.', 'warn');
+      }
+    } catch (e) {
+      showToast(`Cannot reach backend: ${e.message}. Is Flask running?`, 'error');
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">schedule_send</span>Refresh Status';
+      btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">schedule_send</span>Run Pending';
     }
   }
 

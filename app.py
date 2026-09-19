@@ -33,10 +33,6 @@ supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_
 cipher_suite = Fernet(os.getenv("FERNET_KEY").encode())
 init_auth(supabase)
 
-# Shared secret the cron caller (Vercel Cron / cron-job.org) must present.
-# Without this, /api/scheduled/run was previously callable by anyone.
-CRON_SECRET = os.getenv("CRON_SECRET")
-
 DAILY_SEND_LIMIT = 50
 
 # ---------------------------------------------------------------------------
@@ -1302,25 +1298,13 @@ def analytics_summary():
 
 # ---------------------------------------------------------------------------
 # Scheduled jobs runner + follow-up runner — now requires a shared secret so
-# it can only be triggered by your own cron caller (Vercel Cron / cron-job.org
-# with the header set), not by anyone who finds the URL. Also claims each job
-# with a conditional UPDATE so two concurrent cron ticks can't double-send.
+# open, unauthenticated, exactly as it was on MOCHI-Backend — this keeps
+# your existing free-tier cron job (cron-job.org or similar) working with
+# no changes on its end. Job claiming (conditional UPDATE) is still kept so
+# two overlapping cron ticks can't double-send the same job.
 # ---------------------------------------------------------------------------
-def _cron_authorized():
-    if not CRON_SECRET:
-        # No secret configured — fail closed rather than silently open.
-        return False
-    auth_header = request.headers.get('Authorization', '')
-    bearer = auth_header[len('Bearer '):].strip() if auth_header.startswith('Bearer ') else None
-    provided = request.headers.get('X-Cron-Secret') or request.args.get('cron_secret') or bearer
-    return provided == CRON_SECRET
-
-
 @app.route('/api/scheduled/run', methods=['GET', 'POST'])
 def run_scheduled():
-    if not _cron_authorized():
-        return jsonify({"status": "error", "message": "Unauthorized."}), 401
-
     now = datetime.now(timezone.utc).isoformat()
     sent, failed = 0, 0
 
