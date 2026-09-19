@@ -349,39 +349,22 @@
     }).join('');
   }
 
-  // ── Run scheduled sends manually ──────────────────────────────
+  // ── Scheduled sends: now server-driven, not client-triggered ──────────
+  // /api/scheduled/run requires a CRON_SECRET the browser is never given —
+  // it's called automatically by Vercel Cron every 5 minutes (see
+  // vercel.json), so pending jobs get sent even if this tab (or any tab)
+  // is closed. This button just refreshes the view to show current status
+  // rather than pretending to trigger the send itself.
   async function runScheduledNow() {
     const btn = document.getElementById('runScheduledBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Running...';
-
+    btn.innerHTML = '<span class="spinner"></span> Refreshing...';
     try {
-      const res = await fetch(`${API_BASE_URL}/api/scheduled/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        showToast(`Server error ${res.status}: ${text.slice(0, 120)}`, 'error');
-        return;
-      }
-
-      const d = await res.json();
-      if (d.sent > 0) {
-        showToast(`✓ Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''}.`, 'success');
-        await Promise.all([loadHistory(currentUid), loadPendingJobs(currentUid)]);
-      } else if (d.failed > 0) {
-        const reason = d.errors?.[0]?.reason || 'unknown error';
-        showToast(`Send failed: ${reason}`, 'error');
-      } else {
-        showToast('No pending emails to send right now.', 'warn');
-      }
-    } catch (e) {
-      showToast(`Cannot reach backend: ${e.message}. Is Flask running?`, 'error');
+      await Promise.all([loadHistory(currentUid), loadPendingJobs(currentUid)]);
+      showToast('Refreshed — pending emails are sent automatically by the server every few minutes.', 'success');
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">schedule_send</span>Run Pending';
+      btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">schedule_send</span>Refresh Status';
     }
   }
 
@@ -411,9 +394,11 @@
     try {
       const res = await fetch(`${API_BASE_URL}/api/replies/check`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
-          user_id: session.user.id,
           smtp_config_id: accounts[0].id
         })
       });
@@ -528,13 +513,22 @@
   }
 
   // ── Export CSV ────────────────────────────────────────────────
+  // A plain <a href> can't carry an Authorization header, and the backend
+  // now requires one (it no longer trusts a ?user_id= query param) — so
+  // fetch the CSV as a blob and trigger the download from that instead.
   async function exportCsv() {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return;
-    const url = `${API_BASE_URL}/api/export/csv?user_id=${session.user.id}`;
+    const res = await fetch(`${API_BASE_URL}/api/export/csv`, {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    });
+    if (!res.ok) { showToast('Export failed.', 'error'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'sent_emails.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   function escHtml(s) {

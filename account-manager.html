@@ -494,10 +494,14 @@
     span.innerHTML = `<span class="spinner"></span>`;
 
     try {
+      const { data: { session } } = await sb.auth.getSession();
       const res = await fetch(`${API_BASE_URL}/api/smtp/add`, {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ user_id: currentUserId, email, app_password: pwd })
+        headers: {
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ email, app_password: pwd })
       });
       const d = await res.json();
       if (d.status === 'success') {

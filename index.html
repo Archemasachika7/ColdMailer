@@ -703,6 +703,15 @@ Thanks for your time,
   // Current template selection
   let currentTemplate = 'Industry';
 
+  // Backend no longer trusts a client-supplied user_id — every request must
+  // carry the real Supabase session token, verified server-side.
+  async function authedFetch(url, options = {}) {
+    const { data: { session } } = await sb.auth.getSession();
+    const headers = new Headers(options.headers || {});
+    if (session) headers.set('Authorization', `Bearer ${session.access_token}`);
+    return fetch(url, { ...options, headers });
+  }
+
   // ── State ────────────────────────────────────────────────────
   let currentUserId = null;
   let currentUserName = 'User';
@@ -870,7 +879,7 @@ Thanks for your time,
     const fd = new FormData();
     fd.append('file', input.files[0]);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/recruiters/parse-file`, { method: 'POST', body: fd });
+      const res = await authedFetch(`${API_BASE_URL}/api/recruiters/parse-file`, { method: 'POST', body: fd });
       const d   = await res.json();
 
       if (d.status !== 'success') {
@@ -941,7 +950,7 @@ Thanks for your time,
     if (resumeFile) fd.append('resume', new File([resumeFile], resumeFile.name, { type: 'application/pdf' }));
 
     try {
-      const res    = await fetch('/api/campaign/bulk', { method: 'POST', body: fd });
+      const res    = await authedFetch('/api/campaign/bulk', { method: 'POST', body: fd });
       const result = await res.json();
       if (result.status === 'done') {
         showToast(`Sent ${result.sent}, failed ${result.failed}, skipped ${result.skipped}.`,
@@ -969,7 +978,7 @@ Thanks for your time,
     const btn = document.getElementById('parseBtn');
     btn.disabled = true; btn.textContent = '...';
     try {
-      const res = await fetch(API_BASE_URL + '/api/parse', {
+      const res = await authedFetch(API_BASE_URL + '/api/parse', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ text })
@@ -1073,7 +1082,7 @@ Thanks for your time,
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/campaign/send`, { method:'POST', body:fd });
+      const res = await authedFetch(`${API_BASE_URL}/api/campaign/send`, { method:'POST', body:fd });
       const result = await res.json();
       if (result.status === 'success' || result.status === 'scheduled') {
         if (result.status === 'scheduled') {
@@ -1205,21 +1214,32 @@ Thanks for your time,
     }
   }
 
+  // NOTE: /api/scheduled/run now requires a server-held CRON_SECRET the
+  // browser never has — actual sending is driven by Vercel Cron every 5 min,
+  // independent of this tab being open. This function just polls Supabase
+  // (readable via RLS as the signed-in owner) to reflect the real outcome
+  // once the cron tick has processed the job — it does not trigger the send.
   async function triggerScheduledSend() {
-    try {
-      const res = await fetch('/api/scheduled/run', { method: 'POST' });
-      const d = await res.json();
-      if (d.sent > 0) {
-        showToast(`✓ Sent ${d.sent} scheduled email${d.sent !== 1 ? 's' : ''} successfully.`, 'success');
+    showToast('Scheduled time reached — the server will send this within a few minutes.', 'success');
+    const deadline = Date.now() + 6 * 60 * 1000;
+    const poll = setInterval(async () => {
+      const { data } = await sb.from('scheduled_jobs')
+        .select('status')
+        .eq('user_id', currentUserId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const status = data && data[0] && data[0].status;
+      if (status === 'sent') {
+        clearInterval(poll);
+        showToast('✓ Scheduled email sent successfully.', 'success');
         await loadSmtpAccounts();
-      } else if (d.failed > 0) {
-        showToast(`Scheduled send failed. Check SMTP credentials.`, 'error');
-      } else {
-        showToast('No pending emails found — may have already sent.', 'success');
+      } else if (status === 'failed' || status === 'skipped_limit') {
+        clearInterval(poll);
+        showToast('Scheduled send did not go through — check SMTP credentials / daily limit.', 'error');
+      } else if (Date.now() > deadline) {
+        clearInterval(poll);
       }
-    } catch(e) {
-      showToast('Auto-send failed — server unreachable. Try "Run pending".', 'error');
-    }
+    }, 15000);
   }
 
   // Re-attach watcher on page load if there are pending jobs

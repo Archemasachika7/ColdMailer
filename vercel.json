@@ -30,5 +30,11 @@
       "src": "/(.*)",
       "dest": "/$1"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/scheduled/run",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }
