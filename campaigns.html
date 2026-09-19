@@ -30,8 +30,8 @@
   .btn-ghost { background:transparent; border:1px solid var(--border-mid); color:var(--text-dim); font-size:11px; font-weight:600; font-family:'IBM Plex Mono',monospace; letter-spacing:.1em; text-transform:uppercase; padding:7px 14px; border-radius:3px; cursor:pointer; }
   .btn-ghost:hover { border-color:var(--cyan); color:var(--cyan); }
   .field-label { display:block; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; }
-  #toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border); padding:12px 20px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text); transform:translateY(20px); opacity:0; transition:all .25s; pointer-events:none; max-width:340px; z-index:9999; }
-  #toast.show { transform:translateY(0); opacity:1; } #toast.success { border-left:3px solid var(--cyan); } #toast.error { border-left:3px solid var(--red); color:var(--red); }
+  #toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border-mid); padding:12px 20px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text); transform:translateY(16px) scale(.97); opacity:0; transition:all .3s cubic-bezier(.2,.9,.3,1); pointer-events:none; max-width:340px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  #toast.show { transform:translateY(0) scale(1); opacity:1; } #toast.success { border-left:3px solid var(--cyan); } #toast.error { border-left:3px solid var(--red); color:var(--red); }
   .campaign-card { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:16px; cursor:pointer; transition:.15s; }
   .campaign-card:hover { border-color:var(--border-mid); }
   .campaign-card.active { border-color:var(--cyan); background:rgba(0,242,255,0.03); }
@@ -44,9 +44,35 @@
   td { padding:10px 12px; border-bottom:1px solid var(--border); }
   .chip { display:inline-flex; align-items:center; gap:4px; font-family:'IBM Plex Mono',monospace; font-size:10px; padding:3px 8px; border-radius:3px; background:rgba(0,242,255,0.06); border:1px solid var(--border); color:var(--text-dim); margin:2px; }
   .chip button { background:none; border:none; color:var(--red); cursor:pointer; font-size:12px; padding:0; }
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); backdrop-filter:blur(2px); display:none; align-items:center; justify-content:center; z-index:1000; }
   .modal-overlay.open { display:flex; }
-  .modal-box { background:var(--surface); border:1px solid var(--border-mid); border-radius:4px; width:92%; max-width:520px; padding:24px; max-height:88vh; overflow-y:auto; }
+  .modal-box { background:var(--surface); border:1px solid var(--border-mid); border-radius:4px; width:92%; max-width:520px; padding:24px; max-height:88vh; overflow-y:auto; animation: modalPop .22s cubic-bezier(.2,.9,.3,1); }
+
+  /* ── Motion & atmosphere ───────────────────────────────────── */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: linear-gradient(rgba(0,242,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,255,0.025) 1px, transparent 1px);
+    background-size:48px 48px; animation: gridDrift 30s linear infinite;
+  }
+  @keyframes gridDrift { 0%{background-position:0 0;} 100%{background-position:48px 96px;} }
+  body::after {
+    content:''; position:fixed; top:-2px; left:0; width:100%; height:2px; pointer-events:none; z-index:0;
+    background:linear-gradient(90deg, transparent, var(--cyan), transparent); opacity:.3; animation: scanline 8s linear infinite;
+  }
+  @keyframes scanline { 0%{top:-2px;} 100%{top:100%;} }
+  @keyframes fadeUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  .page-enter { animation: fadeUp .45s ease forwards; }
+  @keyframes cardIn { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .stagger { opacity:0; animation: cardIn .4s ease forwards; }
+  @keyframes modalPop { from{opacity:0; transform:scale(.94) translateY(6px);} to{opacity:1; transform:scale(1) translateY(0);} }
+  @keyframes shimmer { 0%{background-position:-300px 0;} 100%{background-position:300px 0;} }
+  .skeleton { background:linear-gradient(90deg, rgba(255,255,255,0.015) 25%, rgba(0,242,255,0.05) 37%, rgba(255,255,255,0.015) 63%); background-size:600px 100%; animation:shimmer 1.3s infinite linear; border-radius:3px; display:inline-block; }
+  .btn-cyan, .btn-ghost { transition: transform .15s ease, box-shadow .2s ease, border-color .15s ease, color .15s ease, background .15s ease; }
+  .btn-cyan:hover { transform: translateY(-1px); } .btn-cyan:active { transform: scale(.96); } .btn-ghost:active { transform: scale(.96); }
+  .campaign-card { transition: background .18s ease, border-color .18s ease, transform .15s ease, box-shadow .2s ease; }
+  .campaign-card:hover { transform: translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,.2); }
+  #campaignDetail.fade-refresh { animation: fadeUp .3s ease; }
+  nav, main, .modal-overlay, #toast { position:relative; z-index:1; }
 </style>
 </head>
 <body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
@@ -74,7 +100,7 @@
 </nav>
 
 <main class="flex-1 overflow-y-auto pt-20 md:pt-0">
-  <div class="max-w-[1200px] mx-auto p-4 md:p-6">
+  <div class="max-w-[1200px] mx-auto p-4 md:p-6 page-enter">
     <div class="flex items-center justify-between mb-4">
       <div>
         <h1 class="syne text-2xl font-bold text-white">Campaigns</h1>
@@ -165,8 +191,8 @@
   }
 
   function renderCampaignList() {
-    document.getElementById('campaignList').innerHTML = campaigns.map(c => `
-      <div class="campaign-card ${c.id === selectedCampaignId ? 'active' : ''}" onclick="selectCampaign('${c.id}')">
+    document.getElementById('campaignList').innerHTML = campaigns.map((c, i) => `
+      <div class="campaign-card stagger ${c.id === selectedCampaignId ? 'active' : ''}" style="animation-delay:${Math.min(i*50,400)}ms" onclick="selectCampaign('${c.id}')">
         <div class="text-white font-medium text-sm mb-1">${escHtml(c.name)}</div>
         <div class="flex items-center gap-2">
           <span class="badge badge-${c.status}">${escHtml(c.status)}</span>
@@ -210,10 +236,16 @@
   async function selectCampaign(id) {
     selectedCampaignId = id;
     renderCampaignList();
+    const detail = document.getElementById('campaignDetail');
+    detail.innerHTML = `<div class="flex items-center gap-2 mono text-[12px] text-[var(--text-dim)]"><span class="skeleton" style="width:16px;height:16px;border-radius:50%;"></span> Loading campaign...</div>`;
     const res = await authedFetch(`/api/campaigns/${id}`);
     const d = await res.json();
     if (d.status !== 'ok') return;
     renderCampaignDetail(d.campaign, d.recipients);
+    // Retrigger the fade-in: remove, force reflow, re-add.
+    detail.classList.remove('fade-refresh');
+    void detail.offsetWidth;
+    detail.classList.add('fade-refresh');
   }
 
   function contactLabel(id) {

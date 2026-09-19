@@ -35,7 +35,18 @@
         linear-gradient(90deg, rgba(0,242,255,0.02) 1px, transparent 1px);
       background-size: 48px 48px;
       pointer-events: none; z-index: 0;
+      animation: gridDrift 30s linear infinite;
     }
+    @keyframes gridDrift { 0% { background-position: 0 0; } 100% { background-position: 48px 96px; } }
+    body::after {
+      content: ''; position: fixed; top: -2px; left: 0; width: 100%; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0.25; pointer-events: none; z-index: 0;
+      animation: scanline 9s linear infinite;
+    }
+    @keyframes scanline { 0% { top: -2px; } 100% { top: 100%; } }
+    @keyframes fadeUpPage { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .page-enter { animation: fadeUpPage 0.4s ease forwards; }
 
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -272,7 +283,7 @@
   </nav>
 
   <!-- ── MAIN ── -->
-  <main class="flex-1 overflow-y-auto p-6 relative z-10">
+  <main class="flex-1 overflow-y-auto p-6 relative z-10 page-enter">
     <div class="max-w-5xl mx-auto">
 
       <div class="flex items-start justify-between mb-8">

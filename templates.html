@@ -31,8 +31,8 @@
   .btn-ghost:hover { border-color:var(--cyan); color:var(--cyan); }
   .btn-ghost.active { color:var(--cyan); border-color:var(--cyan); background:rgba(0,242,255,0.06); }
   .field-label { display:block; font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; color:var(--text-dim); margin-bottom:5px; }
-  #toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border); padding:12px 20px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text); transform:translateY(20px); opacity:0; transition:all .25s; pointer-events:none; max-width:340px; z-index:9999; }
-  #toast.show { transform:translateY(0); opacity:1; } #toast.success { border-left:3px solid var(--cyan); } #toast.error { border-left:3px solid var(--red); color:var(--red); }
+  #toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border-mid); padding:12px 20px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text); transform:translateY(16px) scale(.97); opacity:0; transition:all .3s cubic-bezier(.2,.9,.3,1); pointer-events:none; max-width:340px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  #toast.show { transform:translateY(0) scale(1); opacity:1; } #toast.success { border-left:3px solid var(--cyan); } #toast.error { border-left:3px solid var(--red); color:var(--red); }
 
   .block-row { border:1px solid var(--border); border-radius:4px; margin-bottom:8px; overflow:hidden; }
   .block-head { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--surface2); }
@@ -55,6 +55,34 @@
   .preview-plain { background:#0a0e16; border:1px solid var(--border); border-radius:4px; padding:16px; font-family:'IBM Plex Mono',monospace; font-size:12px; white-space:pre-wrap; color:var(--text); }
 
   select#templateList { max-width:220px; }
+
+  /* ── Motion & atmosphere ───────────────────────────────────── */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: linear-gradient(rgba(0,242,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,255,0.025) 1px, transparent 1px);
+    background-size:48px 48px; animation: gridDrift 30s linear infinite;
+  }
+  @keyframes gridDrift { 0%{background-position:0 0;} 100%{background-position:48px 96px;} }
+  body::after {
+    content:''; position:fixed; top:-2px; left:0; width:100%; height:2px; pointer-events:none; z-index:0;
+    background:linear-gradient(90deg, transparent, var(--cyan), transparent); opacity:.3; animation: scanline 8s linear infinite;
+  }
+  @keyframes scanline { 0%{top:-2px;} 100%{top:100%;} }
+  @keyframes fadeUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  .page-enter { animation: fadeUp .45s ease forwards; }
+  @keyframes cardIn { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+  .stagger { opacity:0; animation: cardIn .35s ease forwards; }
+  @keyframes softFade { from{opacity:.35;} to{opacity:1;} }
+  .preview-refresh { animation: softFade .25s ease; }
+  .btn-cyan, .btn-ghost { transition: transform .15s ease, box-shadow .2s ease, border-color .15s ease, color .15s ease, background .15s ease; }
+  .btn-cyan:hover { transform: translateY(-1px); } .btn-cyan:active { transform: scale(.96); } .btn-ghost:active { transform: scale(.96); }
+  .block-row { transition: border-color .2s ease, box-shadow .2s ease; }
+  .block-row:hover { border-color: var(--border-mid); }
+  .varchip { transition: transform .12s ease, background .15s ease; }
+  .varchip:active { transform: scale(.93); }
+  .switch { transition: background .2s ease; }
+  .switch::after { transition: transform .2s cubic-bezier(.34,1.56,.64,1); }
+  nav, main, .modal-overlay, #toast { position:relative; z-index:1; }
 </style>
 </head>
 <body class="text-[#c9d1d9] flex h-screen overflow-hidden relative">
@@ -82,7 +110,7 @@
 </nav>
 
 <main class="flex-1 overflow-y-auto pt-20 md:pt-0">
-  <div class="max-w-[1400px] mx-auto p-4 md:p-6">
+  <div class="max-w-[1400px] mx-auto p-4 md:p-6 page-enter">
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
       <div>
         <h1 class="syne text-2xl font-bold text-white">Templates</h1>
@@ -241,7 +269,7 @@
   function renderBlocks() {
     const labelOf = key => (blockRegistry.find(b => b.key === key) || {}).label || key;
     document.getElementById('blocksContainer').innerHTML = blocksState.map((b, i) => `
-      <div class="block-row">
+      <div class="block-row stagger" style="animation-delay:${Math.min(i*30,300)}ms">
         <div class="block-head ${b.enabled ? '' : 'disabled'}">
           <span class="mono text-[11px] text-white">${escHtml(labelOf(b.key))}</span>
           <div class="switch ${b.enabled ? 'on' : ''}" onclick="toggleBlock(${i})"></div>
@@ -386,6 +414,14 @@
     document.getElementById('previewHtmlDesktop').innerHTML = `<iframe style="width:100%;height:400px;border:none;" srcdoc="${escHtml(d.html)}"></iframe>`;
     document.getElementById('previewHtmlMobile').innerHTML = `<iframe style="width:100%;height:500px;border:none;" srcdoc="${escHtml(d.html)}"></iframe>`;
     document.getElementById('previewPlain').textContent = d.plain_text;
+
+    // Subtle re-fade so repeated edits visibly refresh the preview, not just silently replace it.
+    ['previewHtmlDesktop','previewHtmlMobile','previewPlain'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('preview-refresh');
+      void el.offsetWidth;
+      el.classList.add('preview-refresh');
+    });
   }
 
   async function sendTest() {
