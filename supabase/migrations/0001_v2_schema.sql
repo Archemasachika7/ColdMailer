@@ -261,7 +261,7 @@ declare
     t text;
 begin
     foreach t in array array[
-        'smtp_configs','applications','scheduled_jobs','profiles','companies',
+        'smtp_configs','applications','scheduled_jobs','companies',
         'contacts','assets','templates','campaigns','conversations','follow_ups'
     ] loop
         execute format('drop policy if exists "owner_all" on public.%I;', t);
